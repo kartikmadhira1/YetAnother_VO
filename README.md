@@ -22,6 +22,17 @@ Iterative addition on top of the YA_VO with Stereo setup.
 
 
 ##### Compiilation steps (Linux):
+
+0. OpenCV and OpenCV contrib with flags. [To be updated]
 1. Set g2o path in CMakeLists.txt:
 ```set(G2O_DIR /Users/kartikmadhira/g2o/cmake_modules)```
-2. If g2o could not be found copy FindG2O.cmake to `/usr/share/cmake-3.16/Modules/`
+2. If g2o could not be found copy FindG2O.cmake to 
+`/usr/share/cmake-3.16/Modules/`
+3. Install jsoncpp :
+```sudo apt-get install libjsoncpp-dev```
+4. Install Sophus from :
+```git clone https://github.com/strasdat/Sophus.git```
+5. Install Pangolin using [these](https://github.com/stevenlovegrove/Pangolin) instructions.
+6. Install google test from [these](https://github.com/google/googletest/blob/main/googletest/README.md) instructions.
+7. Install glog from [these](https://github.com/google/glog#id5) instructions.
+8. Install Eigen using [these](https://stackoverflow.com/a/72150616) instructions.

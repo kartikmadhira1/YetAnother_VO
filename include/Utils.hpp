@@ -8,17 +8,16 @@
 #include <ctype.h>
 #include <mutex>
 #include <chrono>
-#include <json/json.h>
+#include <jsoncpp/json/json.h>
 #include <sophus/se3.hpp>
-#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <boost/filesystem.hpp>
 #include "opencv4/opencv2/core.hpp"
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/video/tracking.hpp>
 #include "opencv4/opencv2/imgproc/imgproc.hpp"
 #include "opencv4/opencv2/highgui/highgui.hpp"
-#include <opencv2/core/eigen.hpp>
-
+#include "opencv4/opencv2/features2d.hpp"
 
 // common typedefs
 typedef Eigen::Matrix<double, 3, 4> Mat34;

@@ -24,7 +24,7 @@ set(G2O_ROOT /usr/local/include/g2o)
 
 
 find_package(G2O REQUIRED)
-
+find_package(Iconv REQUIRED)
 find_package(Boost REQUIRED COMPONENTS)
 #INCLUDE_DIRECTORIES ( "$ENV{EIGEN3_INCLUDE_DIR}" )
 find_package(OpenGL REQUIRED)
@@ -57,26 +57,24 @@ PATH_SUFFIXES lib)
 
 
 add_executable(
-  yavio2
-  src/main.cc 
+  yavio2 src/main.cc src/Utils.cc
 )
 target_link_libraries(
-    yavio2 ${OpenCV_LIBS} jsoncpp_lib ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
-  glog::glog
-)
+    yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
+    glog::glog)
 
 
 # Link CHOLMOD if available, CSparse otherwise
 
-enable_testing()
+# enable_testing()
 
-add_executable(
-  UtilsTest
-  tests/UtilsTest.cc src/Utils.cc
-)
-target_link_libraries(
-  UtilsTest
-  GTest::gtest_main ${Boost_LIBRARIES} ${OpenCV_LIBS}
-)
+# add_executable(
+#   UtilsTest
+#   tests/UtilsTest.cc src/Utils.cc
+# )
+# target_link_libraries(
+#   UtilsTest
+#   GTest::gtest_main ${Boost_LIBRARIES} ${OpenCV_LIBS}
+# )
 
-include(GoogleTest)
+# include(GoogleTest)
