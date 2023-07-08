@@ -63,18 +63,23 @@ target_link_libraries(
     yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
     glog::glog)
 
+# add_executable(
+#   dataHandler src/Kitti.cc src/Utils.cc
+# )
 
+# target_link_libraries(
+#   dataHandler PRIVATE Iconv::Iconv jsoncpp_lib ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} 
+#     glog::glog)
 # Link CHOLMOD if available, CSparse otherwise
 
-# enable_testing()
+enable_testing()
 
-# add_executable(
-#   UtilsTest
-#   tests/UtilsTest.cc src/Utils.cc
-# )
-# target_link_libraries(
-#   UtilsTest
-#   GTest::gtest_main ${Boost_LIBRARIES} ${OpenCV_LIBS}
-# )
+add_executable(
+  DataHandlerTest tests/DataHandlerTest.cc src/Kitti.cc src/Utils.cc
+)
+target_link_libraries(
+  DataHandlerTest
+  GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS}
+)
 
-# include(GoogleTest)
+include(GoogleTest)

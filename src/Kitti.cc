@@ -13,17 +13,18 @@ void KITTI::loadConfig(std::string &_path) {
     }
     this->basePath = value["basePath"].asString();
     this->seqNo = value["sequence"].asString();
-    this->calibPath = basePath  + seqNo + "/calib.txt";
+    this->calibPath = this->basePath  + this->seqNo + "/calib.txt";
     this->camType = value["cameraType"].asString();
     if (this->camType == "mono") {
-        leftImagesPath = basePath + seqNo + "/image_0/";
+        leftImagesPath = this->basePath + this->seqNo + "/image_0/";
         // rightImagesPath = basePath + seqNo + "/images_1/";
         rightImagesPath = "";
     } else {
         this-> isStereo = true;
-        leftImagesPath = basePath + seqNo + "/image_0/";
-        rightImagesPath = basePath + seqNo + "/image_1/";
+        leftImagesPath = this->basePath + this->seqNo + "/image_0/";
+        rightImagesPath = this->basePath + this->seqNo + "/image_1/";
     }
+    LOG(INFO) << "Successfully loaded config file" << std::endl;
 }
 
 
@@ -130,3 +131,4 @@ cv::Mat KITTI::getNextData(CameraSide cam) {
         return cv::Mat();
     }
 }
+

@@ -49,6 +49,7 @@ class KITTI : public DataHandler {
     public:
         KITTI(std::string &_configPath) {
             currFrameId = 0;
+            loadConfig(_configPath);
         }
 
         void loadConfig(std::string &_path);

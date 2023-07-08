@@ -33,7 +33,7 @@ void parseCalibString(std::string string, cv::Mat &cvMat);
 
 
 
-void getCalibParams(std::string _path, Intrinsics &calib);
+// void getCalibParams(std::string _psath, Intrinsics &calib);
 
 
 std::vector<boost::filesystem::path> getFilesInFolder(const std::string &path);
