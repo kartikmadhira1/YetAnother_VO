@@ -1,0 +1,6 @@
+{
+    "basePath" : "/home/kartik/data/KITTI/data_odometry_gray/dataset/sequences", 
+    "sequence" : "00", 
+    "cameraType" : "stereo",
+    "calibPath" : "calib.txt"
+}

@@ -3,6 +3,7 @@
 
 
 void KITTI::loadConfig(std::string &_path) {
+
     std::ifstream ifs(_path);
     Json::Reader reader;
     Json::Value value;
@@ -12,17 +13,22 @@ void KITTI::loadConfig(std::string &_path) {
         LOG(ERROR) << "Error parsing config file" << std::endl;
     }
     this->basePath = value["basePath"].asString();
+        
+    // Ensure path has a trailing slash
+    if (this->basePath.back() != '/') {
+        this->basePath  += '/';
+    }
     this->seqNo = value["sequence"].asString();
     this->calibPath = this->basePath  + this->seqNo + "/calib.txt";
     this->camType = value["cameraType"].asString();
     if (this->camType == "mono") {
-        leftImagesPath = this->basePath + this->seqNo + "/image_0/";
+        this->leftImagesPath = this->basePath + this->seqNo + "/image_0/";
         // rightImagesPath = basePath + seqNo + "/images_1/";
         rightImagesPath = "";
     } else {
         this-> isStereo = true;
-        leftImagesPath = this->basePath + this->seqNo + "/image_0/";
-        rightImagesPath = this->basePath + this->seqNo + "/image_1/";
+        this->leftImagesPath = this->basePath + this->seqNo + "/image_0/";
+        this->rightImagesPath = this->basePath + this->seqNo + "/image_1/";
     }
     LOG(INFO) << "Successfully loaded config file" << std::endl;
 }
@@ -88,37 +94,61 @@ void KITTI::generatePathTrains() {
     std::vector<boost::filesystem::path> filesLeft;
     std::vector<boost::filesystem::path> filesRight;
     if (this->isStereo) {
-        filesLeft = getFilesInFolder(leftImagesPath);
+        filesLeft = getFilesInFolder(this->leftImagesPath);
         for (auto &eachLeftPath : filesLeft) {
-            leftImageTrain.push_back(eachLeftPath.string());
+            this->leftImageTrain.push_back(eachLeftPath.string());
         }
         // Generate train for Right
-        filesRight = getFilesInFolder(rightImagesPath);
+        filesRight = getFilesInFolder(this->rightImagesPath);
         for (auto &eachRightPath : filesRight) {
-            rightImageTrain.push_back(eachRightPath.string());
+            this->rightImageTrain.push_back(eachRightPath.string());
         }
 
     } else {
-        filesLeft = getFilesInFolder(leftImagesPath);
+        filesLeft = getFilesInFolder(this->leftImagesPath);
         for (auto &eachLeftPath : filesLeft) {
-            leftImageTrain.push_back(eachLeftPath.string());
+            this->leftImageTrain.push_back(eachLeftPath.string());
         }
     }
+    this->leftImageTrainIt = this->leftImageTrain.begin();
+    this->rightImageTrainIt = this->rightImageTrain.begin();
 }
 
 
+std::string KITTI::getCurrImagePath(CameraSide cam) {
+    std::string path;
+    if (cam == CameraSide::LEFT) {
+        path = *this->leftImageTrainIt;
+    } else {
+        path = *this->rightImageTrainIt;
+    }
+    return path;
+}
+
+bool KITTI::assertFilename(std::string leftPath, std::string rightPath) {
+    std::string leftFilename = leftPath.substr(leftPath.find_last_of("/\\") + 1);
+    std::string rightFilename = rightPath.substr(rightPath.find_last_of("/\\") + 1);
+    if (leftFilename != rightFilename) {
+        LOG(ERROR) << "Left and Right filenames do not match" << std::endl;
+        return false;
+    }
+    else {
+        LOG(INFO) << "Left Image:" << leftFilename << " Right Image: " << rightFilename << std::endl;
+    }
+    return true;
+}
 
 
 cv::Mat KITTI::getNextData(CameraSide cam) {
     std::string path;
     if (cam == CameraSide::LEFT) {
-        path = *leftImageTrainIt;
+        path = *this->leftImageTrainIt;
     } else {
-        path = *rightImageTrainIt;
+        path = *this->rightImageTrainIt;
     }
 
     try {
-        cv::Mat image = cv::imread(path);
+        cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
         if (cam == CameraSide::LEFT) {
             leftImageTrainIt++;
         } else {

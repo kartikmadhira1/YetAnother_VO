@@ -3,7 +3,9 @@ project(sfm-cpp)
 set(CMAKE_CXX_STANDARD 14)
 # opencv dependencies
 # set(OpenCV_DIR /usr/share/OpenCV)
-find_package(OpenCV REQUIRED)
+find_package(CUDA REQUIRED)
+
+find_package(OpenCV COMPONENTS core highgui cuda)
 include_directories(( ${OpenCV_INCLUDE_DIRS}))
 add_definitions(-DOPENCV_DISABLE_EIGEN_TENSOR_SUPPORT)
 
@@ -36,6 +38,7 @@ find_package(jsoncpp REQUIRED)
 find_package(Boost 1.3 COMPONENTS filesystem) 
 find_package(Eigen3 3.3 REQUIRED)
 find_package(Sophus REQUIRED)
+
 # pangolin
 find_package(Pangolin REQUIRED)
 include_directories(${Pangolin_INCLUDE_DIRS})
@@ -56,12 +59,23 @@ PATHS /usr/local /usr
 PATH_SUFFIXES lib)
 
 
-add_executable(
-  yavio2 src/main.cc src/Utils.cc
-)
-target_link_libraries(
-    yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
-    glog::glog)
+# add_executable(
+#   yavio2 src/main.cc src/Utils.cc
+# )
+# target_link_libraries(
+#     yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
+#     glog::glog)
+
+
+# add_executable(
+#   temp src/temp.cc src/Utils.cc
+# )
+
+# target_link_libraries(
+#   temp PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} 
+#     glog::glog)
+
+
 
 # add_executable(
 #   dataHandler src/Kitti.cc src/Utils.cc
@@ -79,7 +93,17 @@ add_executable(
 )
 target_link_libraries(
   DataHandlerTest
-  GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS}
+  GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS} glog::glog
 )
+
+add_executable(
+  FeaturesTest tests/FeaturesTest.cc src/Kitti.cc src/Utils.cc 
+)
+target_link_libraries(
+  FeaturesTest
+  GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS} glog::glog
+)
+
+
 
 include(GoogleTest)

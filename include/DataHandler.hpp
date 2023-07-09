@@ -39,22 +39,29 @@ class KITTI : public DataHandler {
         std::string rightImagesPath;
         std::vector<std::string> leftImageTrain;
         std::vector<std::string> rightImageTrain;
-        std::vector<std::string>::iterator leftImageTrainIt = leftImageTrain.begin();
-        std::vector<std::string>::iterator rightImageTrainIt = rightImageTrain.begin();
+        std::vector<std::string>::iterator leftImageTrainIt;
+        std::vector<std::string>::iterator rightImageTrainIt;
         std::string camType;
         bool isStereo;
         void parseCalibString(std::string string, cv::Mat &cvMat);
-        void generatePathTrains();
+
 
     public:
         KITTI(std::string &_configPath) {
             currFrameId = 0;
             loadConfig(_configPath);
         }
+        void generatePathTrains();
 
         void loadConfig(std::string &_path);
         Intrinsics::ptr getCalibParams();
         cv::Mat getNextData(CameraSide cam);
+        std::string getCurrImagePath(CameraSide cam);
+        int getTotalFrames() {
+            assert(leftImageTrain.size() == rightImageTrain.size());
+            return leftImageTrain.size();
+        }
+        bool assertFilename(std::string leftPath, std::string rightPath);
 
 
 };

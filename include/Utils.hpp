@@ -20,6 +20,8 @@
 #include "opencv4/opencv2/highgui/highgui.hpp"
 #include "opencv4/opencv2/features2d.hpp"
 #include "opencv4/opencv2/core.hpp"
+#include <opencv4/opencv2/cudaimgproc.hpp>
+
 
 // common typedefs
 typedef Eigen::Matrix<double, 3, 4> Mat34;
