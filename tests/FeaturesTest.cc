@@ -22,13 +22,24 @@ TEST(DataHandlerCheck, checkInstrinsicIntegrity) {
 
     cv::Mat leftImg = kitti.getNextData(CameraSide::LEFT);
     cv::Mat rightImg = kitti.getNextData(CameraSide::RIGHT);
-
-    cv::cuda::GpuMat leftImgGpu, rightImgGpu,kp1, kp2 ,desc1, desc2;
+    // cv::KeyPoint kp1, kp2;
+    cv::imwrite("/home/kartik/devel/projects/YA_VO_2/tests/leftImg.png", leftImg);
+    cv::imwrite("/home/kartik/devel/projects/YA_VO_2/tests/rightImg.png", rightImg);
+    cv::cuda::GpuMat leftImgGpu, rightImgGpu, kp1, kp2, desc1, desc2;
     // std::vector<cv::KeyPoint> kp1, kp2;
     leftImgGpu.upload(leftImg);
-    // rightImgGpu.upload(rightImg);
-    // Features<cv::cuda::GpuMat> features(DetectorType::ORB, DescriptorType::BRIEF, true);
+    rightImgGpu.upload(rightImg);
+  
     Features<cv::cuda::GpuMat>::Ptr features = std::make_shared<Features<cv::cuda::GpuMat>>(DetectorType::ORB, DescriptorType::BRIEF, true);
     features->detectFeaturesGPU(leftImgGpu, kp1, desc1);
+    features->detectFeaturesGPU(rightImgGpu, kp2, desc2);
+    std::vector<cv::DMatch> matches;
+    features->matchFeaturesGPU(desc1, desc2, matches);
+    std::cout << kp1.size() << std::endl;
+    std::cout << kp2.size() << std::endl;
+
+    cv::Mat outImgCPU;
+    features->drawMatchesGPU(leftImgGpu, rightImgGpu, kp1,  kp2, matches, outImgCPU);
+    cv::imwrite("/home/kartik/devel/projects/YA_VO_2/tests/matches.png", outImgCPU);
 }
 

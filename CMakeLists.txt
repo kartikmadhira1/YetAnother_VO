@@ -97,11 +97,13 @@ target_link_libraries(
 )
 
 add_executable(
-  FeaturesTest tests/FeaturesTest.cc src/Kitti.cc src/Utils.cc 
-)
+  FeaturesTest tests/FeaturesTest.cc src/Kitti.cc src/Utils.cc  include/Features.hpp)
 target_link_libraries(
   FeaturesTest
   GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS} glog::glog
+  nvToolsExt
+  opencv_cudafeatures2d
+
 )
 
 
