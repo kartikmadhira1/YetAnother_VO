@@ -9,8 +9,9 @@ Iterative addition on top of the YA_VO with Stereo setup.
 2. Focus on optimization with more emphasis on explainable optimization code.
 3. Efficient initialization of stereo setup.
 4. Local BA and full BA fully utilized.
-5. Use OpenCV codes as little as possible.
-6. Lastly, be able to validate the odometry with an error rate. Math to evaluate trajectories also essential.
+5. Get Loop closure working.
+6. Use OpenCV codes as little as possible.
+7. Lastly, be able to validate the odometry with an error rate. Math to evaluate trajectories also essential.
 
 #### Secondary goals of the project
 

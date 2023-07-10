@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <ctype.h>
+#include <map>
 #include <mutex>
 #include <chrono>
 #include <jsoncpp/json/json.h>

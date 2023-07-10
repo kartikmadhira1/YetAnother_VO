@@ -42,6 +42,7 @@ class KITTI : public DataHandler {
         std::vector<std::string>::iterator leftImageTrainIt;
         std::vector<std::string>::iterator rightImageTrainIt;
         std::string camType;
+        std::string cudaSet;
         bool isStereo;
         void parseCalibString(std::string string, cv::Mat &cvMat);
 
@@ -52,7 +53,7 @@ class KITTI : public DataHandler {
             loadConfig(_configPath);
         }
         void generatePathTrains();
-
+  
         void loadConfig(std::string &_path);
         Intrinsics::ptr getCalibParams();
         cv::Mat getNextData(CameraSide cam);

@@ -30,6 +30,11 @@ void KITTI::loadConfig(std::string &_path) {
         this->leftImagesPath = this->basePath + this->seqNo + "/image_0/";
         this->rightImagesPath = this->basePath + this->seqNo + "/image_1/";
     }
+    if (value["cuda"].asString() == "true") {
+        this->cudaSet = "true";
+    } else {
+        this->cudaSet = "false";
+    }
     LOG(INFO) << "Successfully loaded config file" << std::endl;
 }
 
