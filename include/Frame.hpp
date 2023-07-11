@@ -1,6 +1,11 @@
+#ifndef FRAME_HPP
+#define FRAME_HPP
+
+
+
 #include "../include/Utils.hpp"
 #include "../include/DataHandler.hpp"
-
+#include "../include/MapPoint.hpp"
 
 
 class Frame  {
@@ -15,6 +20,8 @@ class Frame  {
     
     public:
         typedef std::shared_ptr<Frame> Ptr;
+        typedef std::shared_ptr<Frame> RightPtr;
+
         Frame() {}
         Frame(unsigned long _frameID, Sophus::SE3d _pose, std::vector<cv::KeyPoint> _keypoints, cv::Mat _descriptors) {
             frameID = _frameID;
@@ -45,4 +52,17 @@ class Frame  {
             }
             matchKpMap[frameID] = std::make_pair(src, dst);
         }
+
+        static unsigned long createFrameID() {
+            static unsigned long frameID = 0;
+            return frameID++;
+        }
+
+
+        // add observation/3D points to the frame
+
+
+
 };
+
+#endif

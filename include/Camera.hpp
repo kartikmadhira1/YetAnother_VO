@@ -31,6 +31,9 @@ struct Camera {
         float getFy() {
             return K.at<double>(1,1);
         }
+        float getF() {
+            return (getFx() + getFy())/2;
+        }
         float getCx() {
             return K.at<double>(0,2);
         }
