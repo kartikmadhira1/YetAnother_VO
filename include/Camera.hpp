@@ -45,6 +45,15 @@ struct Camera {
             return baseline;
         }
         void getCalibMat() {}
+        
+        Vec3 pixel2camera(const cv::Point p) {
+            double depth = 1;
+            return Vec3(
+            (p.x - getCx()) * depth / getFx(),
+            (p.y - getCy()) * depth / getFy()
+            1);
+        }
+        
         void printK() {
             for (int i=0; i < K.rows; i++) {
                 for (int j=0; j<K.cols;j++) {

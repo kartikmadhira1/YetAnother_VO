@@ -58,3 +58,64 @@ bool _3DHandler::getPoseFromEssential(const cv::Mat &E, const std::vector<cv::DM
     
     return true;
 }
+
+// trinagulation after creating Map and MapPoints
+
+bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches, cv::Mat &pnts3D) {
+    
+    // set poses for both views
+    std::vector<Sophus::SE3d> poses{srcFrame->pose, dstFrame->pose};
+
+    std::vector<cv::Point2f> srcPts;
+    std::vector<cv::Point2f> dstPts;
+
+    int landmarkCount = 0;
+    for (auto &match : matches) {
+        // get the keypoints that have been matched
+        std::vector<Vec3> points {
+            this->intrinsics->Left.pixel2camera(cv::Point(srcFrame->keypoints[match.queryIdx].pt));
+            this->intrinsics->Left.pixel2camera(cv::Point(dstFrame->keypoints[match.trainIdx].pt));
+        }
+        Vec3 pWorld = Vec3::Zero();
+        if (triangulatePoint(poses, points, pWorld) && pWorld[2] > 0) {
+            // update landmark count
+            landmarkCount++;
+            // add the 3d point to the map
+            auto newMapPoint = std::make_shared<MapPoint>(MapPoint::createMapPointID(), pWorld);
+            // register the features that led to creation of this 3d point
+            newMapPoint->addObservation(srcFrame->getFrameID(), match.queryIdx);
+            newMapPoint->addObservation(dstFrame->getFrameID(), match.trainIdx);
+
+            // add the 3d point to the frame observations
+            srcFrame->addMapPoint(newMapPoint);
+            dstFrame->addMapPoint(newMapPoint);
+
+            // add the 3d point to the map itself??????*******************  
+        }          
+    }
+    LOG(INFO) << "Triangulated: " << landmarkCount << " points";
+    LOG(INFO) << "Total Matches: " << matches.size();
+}
+
+
+
+
+inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
+                   const std::vector<Vec3> points, Vec3 &3DPoint) {
+    MatXX A(2 * poses.size(), 4);
+    VecX b(2 * poses.size());
+    b.setZero();
+    for (size_t i = 0; i < poses.size(); ++i) {
+        Mat34 m = poses[i].matrix3x4();
+        A.block<1, 4>(2 * i, 0) = points[i][0] * m.row(2) - m.row(0);
+        A.block<1, 4>(2 * i + 1, 0) = points[i][1] * m.row(2) - m.row(1);
+    }
+    auto svd = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+    3DPoint = (svd.matrixV().col(3) / svd.matrixV()(3, 3)).head<3>();
+
+    if (svd.singularValues()[3] / svd.singularValues()[2] < 1e-2) {
+        // 解质量不好，放弃
+        return true;
+    }
+    return false;
+}

@@ -17,7 +17,8 @@ class Frame  {
         // its a frameiD -> <source ID, dst ID > pair for keypoints
         // basically gives you access to which keypoint in src and dst match 
         std::map<unsigned long, std::pair<std::vector<int>, std::vector<int>>> matchKpMap;
-    
+        // mappoint ID -> mappoint
+        std::map<unsigned long, MapPoint::Ptr> obsMapPoints;
     public:
         typedef std::shared_ptr<Frame> Ptr;
         typedef std::shared_ptr<Frame> RightPtr;
@@ -36,6 +37,10 @@ class Frame  {
 
         void setPose(Sophus::SE3d _pose) {
             this->pose = pose;
+        }
+
+        unsigned long getFrameID() {
+            return frameID;
         }
 
         bool updateMatchesMap (unsigned long _frameID, std::vector<cv::DMatch> &matches) {
@@ -60,7 +65,13 @@ class Frame  {
 
 
         // add observation/3D points to the frame
-
+        void addObservation(MapPoint::Ptr mapPoint) {
+            if (obsMapPoints.find(mapPoint->getMapPointID()) != obsMapPoints.end()) {
+                LOG(ERROR) << "Frame ID: " << frameID << " already has a map point ID: " << mapPointID;
+                return;
+            }
+            obsMapPoints[mapPoint->getMapPointID()] = mapPoint;
+        }
 
 
 };

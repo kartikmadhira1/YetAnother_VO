@@ -18,6 +18,13 @@ class MapPoint {
     public:
         typedef std::shared_ptr<MapPoint> Ptr;
         MapPoint() {}
+        MapPoint(unsigned long _mapPointID, cv::Point3d _position) {
+            mapPointID = _mapPointID;
+            position[0] = _position.x;
+            position[1] = _position.y;
+            position[2] = _position.z;            
+            obsCount = 0;
+        }
         MapPoint(unsigned long _mapPointID, Vec3 _position) {
             mapPointID = _mapPointID;
             position = _position;
