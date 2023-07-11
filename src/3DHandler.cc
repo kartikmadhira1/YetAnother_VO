@@ -69,6 +69,12 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
 
+    if (matches.size() < 4) {
+        LOG(ERROR) << "Not enough matches to triangulate";
+        return false;
+    }
+
+
     int landmarkCount = 0;
     for (auto &match : matches) {
         // get the keypoints that have been matched
@@ -114,8 +120,7 @@ inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
     3DPoint = (svd.matrixV().col(3) / svd.matrixV()(3, 3)).head<3>();
 
     if (svd.singularValues()[3] / svd.singularValues()[2] < 1e-2) {
-        // 解质量不好，放弃
-        return true;
+         return true;
     }
     return false;
 }

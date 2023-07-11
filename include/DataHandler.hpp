@@ -20,6 +20,7 @@ class DataHandler {
         virtual cv::Mat getNextData(CameraSide cam) = 0;
         virtual Intrinsics::ptr getCalibParams() = 0;
         virtual void loadConfig(std::string &path) = 0;
+        typedef std::shared_ptr<DataHandler> Ptr;
 };
 
 

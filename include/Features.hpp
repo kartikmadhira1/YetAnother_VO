@@ -1,3 +1,7 @@
+#ifndef FEATURES_HPP
+#define FEATURES_HPP
+
+
 #include "../include/Utils.hpp"
 #include <opencv4/opencv2/cudafeatures2d.hpp>
 #include <opencv4/opencv2/features2d.hpp>
@@ -74,8 +78,8 @@ class Features {
             detectorType = _detectorType;
             descriptorType = _descType;
             // get cuda device count
-            int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
-            if (deviceCount == 0) {
+            bool cudaSupported = checkCUDAsupport();
+            if (cudaSupported) {
                 LOG(ERROR) << "No CUDA enabled devices found";
                 std::cout << "No CUDA enabled devices found" << std::endl;
                 isGPU = false;
@@ -142,3 +146,6 @@ class Features {
         }
 
 };
+
+
+#endif

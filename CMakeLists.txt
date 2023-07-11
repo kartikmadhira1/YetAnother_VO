@@ -59,12 +59,12 @@ PATHS /usr/local /usr
 PATH_SUFFIXES lib)
 
 
-# add_executable(
-#   yavio2 src/main.cc src/Utils.cc
-# )
-# target_link_libraries(
-#     yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
-#     glog::glog)
+add_executable(
+  yavio2 src/VO.cc src/Utils.cc src/Kitti.cc src/Viz.cc src/Map.cc src/Frame.hpp src/MapPoint.hpp src/Features.hpp 
+)
+target_link_libraries(
+    yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
+    glog::glog)
 
 
 # add_executable(

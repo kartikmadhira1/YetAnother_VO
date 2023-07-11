@@ -80,7 +80,7 @@ struct Intrinsics {
         Intrinsics() {
 
         }
-        typedef std::shared_ptr<Intrinsics> ptr;
+        typedef std::shared_ptr<Intrinsics> Ptr;
         Camera Left;
         Camera Right;
 

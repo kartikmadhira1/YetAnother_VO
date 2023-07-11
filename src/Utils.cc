@@ -32,3 +32,19 @@ std::string type2str(int type) {
 
   return r;
 }
+
+// check cuda support
+
+bool checkCUDAsupport() {
+    int cudaDeviceCount = 0;
+    try {
+        cudaDeviceCount = cv::cuda::getCudaEnabledDeviceCount();
+    } catch (const cv::Exception& ex) {
+        return false;
+    }
+    if (cudaDeviceCount == 0) {
+        return false;
+    }
+
+    return true;
+}

@@ -56,6 +56,7 @@ class _3DHandler {
     private:
         Instrincics::Ptr instrinsics;
     public:
+        _3DHandler() {}
         _3DHandler(Instrinsics::Ptr &_instrinsics) {
             this->instrinsics = _instrinsics;
         }
@@ -104,7 +105,7 @@ class _3DHandler {
         
         
         
-        
+        typedef std::shared_ptr<_3DHandler> Ptr;
         
         
         
