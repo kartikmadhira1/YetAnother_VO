@@ -39,6 +39,7 @@ bool checkCUDAsupport() {
     int cudaDeviceCount = 0;
     try {
         cudaDeviceCount = cv::cuda::getCudaEnabledDeviceCount();
+        
     } catch (const cv::Exception& ex) {
         return false;
     }

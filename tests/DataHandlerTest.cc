@@ -17,7 +17,7 @@ TEST(DataHandlerCheck, checkInstrinsicIntegrity) {
     std::string configPath = "/home/kartik/devel/projects/YA_VO_2/config/KITTI_stereo.json";
     KITTI kitti(configPath);
 
-    Intrinsics::ptr intrinsics = std::make_shared<Intrinsics>();
+    Intrinsics::Ptr intrinsics = std::make_shared<Intrinsics>();
     intrinsics = kitti.getCalibParams();
         
     intrinsics->Right.printP();

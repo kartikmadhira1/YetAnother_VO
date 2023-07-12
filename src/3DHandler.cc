@@ -2,7 +2,6 @@
 
 
 
-
 bool _3DHandler::getEssentialMatrix(std::vector<cv::DMatch> &matches, Frame::Ptr srcFrame, Frame::Ptr dstFrame, cv::Mat &F) {
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
@@ -47,7 +46,7 @@ bool _3DHandler::getPoseFromEssential(const cv::Mat &E, const std::vector<cv::DM
     cv::Mat R, t;
     int inliers;
     try {
-        inliers = cv::recoverPose(E, dstPts, srcPts, instrinsics->Left.getK(), R, t);
+        inliers = cv::recoverPose(E, dstPts, srcPts, intrinsics->Left.getK(), R, t);
     } catch (const std::exception &e) {
         LOG(ERROR) << "Exception in recoverPose: " << e.what();
         LOG(ERROR) << "srcPts: " << srcPts.size() << " dstPts: " << dstPts.size();
@@ -107,7 +106,7 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
 
 
 inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
-                   const std::vector<Vec3> points, Vec3 &3DPoint) {
+                   const std::vector<Vec3> points, Vec3 &_3DPoint) {
     MatXX A(2 * poses.size(), 4);
     VecX b(2 * poses.size());
     b.setZero();
@@ -117,7 +116,7 @@ inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
         A.block<1, 4>(2 * i + 1, 0) = points[i][1] * m.row(2) - m.row(1);
     }
     auto svd = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
-    3DPoint = (svd.matrixV().col(3) / svd.matrixV()(3, 3)).head<3>();
+    _3DPoint = (svd.matrixV().col(3) / svd.matrixV()(3, 3)).head<3>();
 
     if (svd.singularValues()[3] / svd.singularValues()[2] < 1e-2) {
          return true;

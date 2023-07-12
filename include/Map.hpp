@@ -9,21 +9,21 @@
 class Map {
     public:
         // 3d points stored as a map
-        typedef std::unordered_map<unsigned long, MapPoint::ptr> LandMarksType;
-        typedef std::unordered_map<unsigned long, Frame::ptr> FramesType;
-        typedef std::shared_ptr<Map> ptr;
+        typedef std::unordered_map<unsigned long, MapPoint::Ptr> LandMarksType;
+        typedef std::unordered_map<unsigned long, Frame::Ptr> FramesType;
+        typedef std::shared_ptr<Map> Ptr;
 
         Map() {}
         // initialize map with initial pose 
         void initMap();
         // Insert frames and mappoint to the whole map
-        void insertKeyFrame(Frame::ptr fr);
-        void insertMapPoint(MapPoint::ptr mp);
+        void insertKeyFrame(Frame::Ptr fr);
+        void insertMapPoint(MapPoint::Ptr mp);
         FramesType getActiveFrames();
         FramesType getFrames();
         LandMarksType getActiveMPs();
         LandMarksType getMPs();
-        static Map::ptr createMap();
+        static Map::Ptr createMap();
         bool resetActive();
     private:
         std::mutex mapLock;
@@ -31,7 +31,7 @@ class Map {
         FramesType frames;
         LandMarksType activeL;
         FramesType activeF;
-        Frame::ptr currentFrame = nullptr;
+        Frame::Ptr currentFrame = nullptr;
 
 };
 

@@ -60,10 +60,10 @@ PATH_SUFFIXES lib)
 
 
 add_executable(
-  yavio2 src/VO.cc src/Utils.cc src/Kitti.cc src/Viz.cc src/Map.cc src/Frame.hpp src/MapPoint.hpp src/Features.hpp 
+  yavio2 include/VO.cc src/Utils.cc src/Kitti.cc src/Viz.cc src/Map.cc include/Frame.hpp include/MapPoint.hpp include/Features.hpp 
 )
 target_link_libraries(
-    yavio2 PRIVATE Iconv::Iconv ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
+    yavio2 PRIVATE Iconv::Iconv jsoncpp_lib ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
     glog::glog)
 
 

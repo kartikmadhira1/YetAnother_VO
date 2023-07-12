@@ -19,6 +19,7 @@ class Frame  {
         std::map<unsigned long, std::pair<std::vector<int>, std::vector<int>>> matchKpMap;
         // mappoint ID -> mappoint
         std::map<unsigned long, MapPoint::Ptr> obsMapPoints;
+        cv::Mat rawImg;
     public:
         typedef std::shared_ptr<Frame> Ptr;
         typedef std::shared_ptr<Frame> RightPtr;
@@ -67,12 +68,15 @@ class Frame  {
         // add observation/3D points to the frame
         void addObservation(MapPoint::Ptr mapPoint) {
             if (obsMapPoints.find(mapPoint->getMapPointID()) != obsMapPoints.end()) {
-                LOG(ERROR) << "Frame ID: " << frameID << " already has a map point ID: " << mapPointID;
+                LOG(ERROR) << "Frame ID: " << frameID << " already has a map point ID: " << mapPoint->getMapPointID();
                 return;
             }
             obsMapPoints[mapPoint->getMapPointID()] = mapPoint;
         }
 
+        cv::Mat getRawImg() {
+            return rawImg;
+        }
 
 };
 

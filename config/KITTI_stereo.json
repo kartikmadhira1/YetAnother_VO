@@ -3,5 +3,7 @@
     "sequence" : "00", 
     "cameraType" : "stereo",
     "calibPath" : "calib.txt",
-    "useCUDA" : "true"
+    "useCUDA" : "true",
+    "debugMode": "true",
+    "debugSteps" : "2" //number of frames to run in debug mode
 }

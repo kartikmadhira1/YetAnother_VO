@@ -54,11 +54,11 @@ struct Pose {
 
 class _3DHandler {
     private:
-        Instrincics::Ptr instrinsics;
+        Intrinsics::Ptr intrinsics;
     public:
         _3DHandler() {}
-        _3DHandler(Instrinsics::Ptr &_instrinsics) {
-            this->instrinsics = _instrinsics;
+        _3DHandler(Intrinsics::Ptr &_intrinsics) {
+            this->intrinsics = _intrinsics;
         }
 
         /*
@@ -101,7 +101,7 @@ class _3DHandler {
         
         */
         bool triangulePoint(const std::vector<Sophus::SE3d> &poses,
-                   const std::vector<Vec3> lrPoints, Vec3 &3DPoint);
+                   const std::vector<Vec3> lrPoints, Vec3 &_3DPoint);
         
         
         

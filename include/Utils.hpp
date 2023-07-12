@@ -42,6 +42,8 @@ void parseCalibString(std::string string, cv::Mat &cvMat);
 
 std::vector<boost::filesystem::path> getFilesInFolder(const std::string &path);
 
+bool checkCUDAsupport();
+
 
 std::string type2str(int type);
 

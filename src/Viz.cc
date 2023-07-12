@@ -13,12 +13,12 @@ void Viewer::close() {
     viewerRunning = false;
 }
 
-void Viewer::addCurrentFrame(Frame::ptr frame) {
+void Viewer::addCurrentFrame(Frame::Ptr frame) {
     std::unique_lock<std::mutex> viewLock(viewerMutex);
     currentFrame = frame;
 }
 
-void Viewer::setMap(Map::ptr _map) {
+void Viewer::setMap(Map::Ptr _map) {
     std::unique_lock<std::mutex> viewLock(viewerMutex);
     this->map = _map;
 }
@@ -81,29 +81,29 @@ void Viewer::plotterLoop() {
 cv::Mat Viewer::plotFromImage() {
     cv::Mat img;
     // cv::cvtColor(currentFrame->rawImage, img, CV_GRAY2BGR);
-    currentFrame->rawImage.copyTo(img);
-    for (size_t i = 0; i < currentFrame->features.size(); ++i) {
-        if (currentFrame->features[i]->mapPoint.lock()) {
-            auto feat = currentFrame->features[i];
-            // std::cout << feat->kp << std::endl;
-            cv::circle(img, cv::Point2i(feat->kp.y, feat->kp.x), 2, cv::Scalar(0, 250, 0),
-                       2);
-        }
-    }
+    img = currentFrame->getRawImg();
+    // for (size_t i = 0; i < currentFrame->features.size(); ++i) {
+    //     if (currentFrame->features[i]->mapPoint.lock()) {
+    //         auto feat = currentFrame->features[i];
+    //         // std::cout << feat->kp << std::endl;
+    //         cv::circle(img, cv::Point2i(feat->kp.y, feat->kp.x), 2, cv::Scalar(0, 250, 0),
+    //                    2);
+    //     }
+    // }
     return img;
 }
 
 
 void Viewer::followCurrentFrame(pangolin::OpenGlRenderState& visCamera) {
-    Sophus::SE3d Twc = this->currentFrame->pose.inverse();
+    Sophus::SE3d Twc = this->currentFrame->getPose().inverse();
     pangolin::OpenGlMatrix m(Twc.matrix());
     visCamera.Follow(m, true);
 }
 
 
 
-void Viewer::drawFrame(Frame::ptr frame, const float *color) {
-    Sophus::SE3d Twc = frame->pose.inverse();
+void Viewer::drawFrame(Frame::Ptr frame, const float *color) {
+    Sophus::SE3d Twc = frame->getPose().inverse();
     const float sz = 1.0;
     const int line_width = 2.0;
     const float fx = 400;
@@ -159,7 +159,7 @@ void Viewer::drawMPs() {
     glPointSize(2);
     glBegin(GL_POINTS);
     for (auto& ld: mps) {
-        auto pos = ld.second->getPos();
+        auto pos = ld.second->getPosition();
         glColor3f(red[0], red[1], red[2]);
         glVertex3d(pos[0], pos[1], pos[2]);
     }

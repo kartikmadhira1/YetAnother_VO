@@ -21,6 +21,7 @@ void KITTI::loadConfig(std::string &_path) {
     this->seqNo = value["sequence"].asString();
     this->calibPath = this->basePath  + this->seqNo + "/calib.txt";
     this->camType = value["cameraType"].asString();
+    this->debugMode = value["debug"].asString() == "true" ? true : false;
     if (this->camType == "mono") {
         this->leftImagesPath = this->basePath + this->seqNo + "/image_0/";
         // rightImagesPath = basePath + seqNo + "/images_1/";
@@ -30,17 +31,20 @@ void KITTI::loadConfig(std::string &_path) {
         this->leftImagesPath = this->basePath + this->seqNo + "/image_0/";
         this->rightImagesPath = this->basePath + this->seqNo + "/image_1/";
     }
-    if (value["cuda"].asString() == "true") {
+    if (value["useCUDA"].asString() == "true") {
         this->cudaSet = "true";
     } else {
         this->cudaSet = "false";
     }
+
+    this->debugSteps = value["debugSteps"].asUInt64();
+
     LOG(INFO) << "Successfully loaded config file" << std::endl;
 }
 
 
-Intrinsics::ptr KITTI::getCalibParams() {
-    Intrinsics::ptr calib = std::make_shared<Intrinsics>();
+Intrinsics::Ptr KITTI::getCalibParams() {
+    Intrinsics::Ptr calib = std::make_shared<Intrinsics>();
     std::vector<std::string> stringVector;
     std::string line;
     std::ifstream _file(this->calibPath);

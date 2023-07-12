@@ -50,7 +50,7 @@ struct Camera {
             double depth = 1;
             return Vec3(
             (p.x - getCx()) * depth / getFx(),
-            (p.y - getCy()) * depth / getFy()
+            (p.y - getCy()) * depth / getFy(),
             1);
         }
         

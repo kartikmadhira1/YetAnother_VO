@@ -73,20 +73,20 @@ class Features {
 
         }
     public:
-        typedef std::shared_ptr<Features> Ptr;
+        Features() {}
         Features(DetectorType _detectorType, DescriptorType _descType) {
             detectorType = _detectorType;
             descriptorType = _descType;
             // get cuda device count
             bool cudaSupported = checkCUDAsupport();
-            if (cudaSupported) {
+            if (!cudaSupported) {
                 LOG(ERROR) << "No CUDA enabled devices found";
                 std::cout << "No CUDA enabled devices found" << std::endl;
                 isGPU = false;
             }
             else {
-                LOG(INFO) << "CUDA enabled devices found: " << deviceCount;
-                std::cout << "CUDA enabled devices found: " << deviceCount << std::endl;
+                LOG(INFO) << "CUDA enabled devices found";
+                std::cout << "CUDA enabled devices found" << std::endl;
                 isGPU = true;
             }
             init();
@@ -144,6 +144,7 @@ class Features {
         void convertGPUKpts(std::vector<cv::KeyPoint> &keypoints, cv::cuda::GpuMat &keypointsGPU) {
             detectorGPU->convert(keypointsGPU, keypoints);
         }
+        typedef std::shared_ptr<Features<T>> Ptr;
 
 };
 

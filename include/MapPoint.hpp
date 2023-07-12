@@ -39,7 +39,7 @@ class MapPoint {
             obsCount++;
         }
 
-        static void createMapPointID() {
+        static unsigned long createMapPointID() {
             static unsigned long mapPointID = 0;
             return mapPointID++;
         }
@@ -65,4 +65,6 @@ class MapPoint {
             position[1] = _position.y;
             position[2] = _position.z;
         }
-}
+};
+
+#endif // TODOITEM_H

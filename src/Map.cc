@@ -6,34 +6,34 @@
 
 
 // Add frame to the frame_id -> frame mapping with FramesType variable
-void Map::insertKeyFrame(Frame::ptr currFrame) {
+void Map::insertKeyFrame(Frame::Ptr currFrame) {
     std::unique_lock<std::mutex> lck(mapLock);
 
     this->currentFrame = currFrame;
-    if (frames.find(currFrame->frameID) == frames.end()) {
-        frames.insert(std::make_pair(currentFrame->frameID, currentFrame));
+    if (frames.find(currFrame->getFrameID()) == frames.end()) {
+        frames.insert(std::make_pair(currentFrame->getFrameID(), currentFrame));
     } else {
-        frames.insert(std::make_pair(currentFrame->frameID, currentFrame));
+        frames.insert(std::make_pair(currentFrame->getFrameID(), currentFrame));
     }
-    if (activeF.find(currFrame->frameID) == activeF.end()) {
-        activeF.insert(std::make_pair(currentFrame->frameID, currentFrame));
+    if (activeF.find(currFrame->getFrameID()) == activeF.end()) {
+        activeF.insert(std::make_pair(currentFrame->getFrameID(), currentFrame));
     } else {
-        activeF.insert(std::make_pair(currentFrame->frameID, currentFrame));
+        activeF.insert(std::make_pair(currentFrame->getFrameID(), currentFrame));
     }
 }
 
-void Map::insertMapPoint(MapPoint::ptr mp) {
+void Map::insertMapPoint(MapPoint::Ptr mp) {
     std::unique_lock<std::mutex> lck(mapLock);
 
-    if (landmarks.find(mp->ptID) == landmarks.end()) {
-        landmarks.insert(std::make_pair(mp->ptID, mp));
+    if (landmarks.find(mp->getMapPointID()) == landmarks.end()) {
+        landmarks.insert(std::make_pair(mp->getMapPointID(), mp));
     } else {
-        landmarks.insert(std::make_pair(mp->ptID, mp));
+        landmarks.insert(std::make_pair(mp->getMapPointID(), mp));
     }
-    if (activeL.find(mp->ptID) == activeL.end()) {
-        activeL.insert(std::make_pair(mp->ptID, mp));
+    if (activeL.find(mp->getMapPointID()) == activeL.end()) {
+        activeL.insert(std::make_pair(mp->getMapPointID(), mp));
     } else {
-        activeL.insert(std::make_pair(mp->ptID, mp));
+        activeL.insert(std::make_pair(mp->getMapPointID(), mp));
     }
 }
 
@@ -47,8 +47,8 @@ bool Map::resetActive() {
 }
 
 
-Map::ptr Map::createMap() {
-    Map::ptr _map = std::make_shared<Map>();
+Map::Ptr Map::createMap() {
+    Map::Ptr _map = std::make_shared<Map>();
     return _map;
 }
 

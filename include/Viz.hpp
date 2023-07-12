@@ -10,18 +10,18 @@
 
 class Viewer {
     public:
-        typedef std::shared_ptr<Viewer> ptr; 
+        typedef std::shared_ptr<Viewer> Ptr; 
         Viewer();
-        Map::ptr viewerMap;
-        void addCurrentFrame(Frame::ptr frame);
+        Map::Ptr viewerMap;
+        void addCurrentFrame(Frame::Ptr frame);
         // Pin the map used for visualization 
-        void setMap(Map::ptr _map);
+        void setMap(Map::Ptr _map);
         // Every now and then lock the viewer thread and update KFs and MPs 
         void updateMap();
         // main thread loop that plots all KFs and MPs
         void plotterLoop();
         // draw single frame
-        void drawFrame(Frame::ptr frame, const float *color);
+        void drawFrame(Frame::Ptr frame, const float *color);
         // draw single mappoint
         void drawMPs();
         // follow camera when drawing
@@ -30,16 +30,16 @@ class Viewer {
         void close();
         void viewerRun();
         cv::Mat plotFromImage();
-        // static Viewer::ptr createViewer();
+        // static Viewer::Ptr createViewer();
         std::thread viewerThread;
 
     private:
         std::mutex viewerMutex;
-        Map::ptr map = nullptr;
-        Frame::ptr currentFrame = nullptr;
+        Map::Ptr map = nullptr;
+        Frame::Ptr currentFrame = nullptr;
         bool viewerRunning = true;
-        std::unordered_map<unsigned long, MapPoint::ptr> mps;
-        std::unordered_map<unsigned long, Frame::ptr> frames;
+        std::unordered_map<unsigned long, MapPoint::Ptr> mps;
+        std::unordered_map<unsigned long, Frame::Ptr> frames;
 };
 
 #endif // TODOITEM_H

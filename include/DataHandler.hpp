@@ -18,7 +18,7 @@ enum CameraSide {
 class DataHandler {
     public:
         virtual cv::Mat getNextData(CameraSide cam) = 0;
-        virtual Intrinsics::ptr getCalibParams() = 0;
+        virtual Intrinsics::Ptr getCalibParams() = 0;
         virtual void loadConfig(std::string &path) = 0;
         typedef std::shared_ptr<DataHandler> Ptr;
 };
@@ -45,6 +45,8 @@ class KITTI : public DataHandler {
         std::string camType;
         std::string cudaSet;
         bool isStereo;
+        bool debugMode;
+        unsigned long debugSteps;
         void parseCalibString(std::string string, cv::Mat &cvMat);
 
 
@@ -54,9 +56,11 @@ class KITTI : public DataHandler {
             loadConfig(_configPath);
         }
         void generatePathTrains();
-  
+        std::string getBasePath() {
+            return basePath;
+        }
         void loadConfig(std::string &_path);
-        Intrinsics::ptr getCalibParams();
+        Intrinsics::Ptr getCalibParams();
         cv::Mat getNextData(CameraSide cam);
         std::string getCurrImagePath(CameraSide cam);
         int getTotalFrames() {
@@ -64,7 +68,13 @@ class KITTI : public DataHandler {
             return leftImageTrain.size();
         }
         bool assertFilename(std::string leftPath, std::string rightPath);
+        bool getDebugMode() {
+            return debugMode;
+        }
 
+        unsigned long getDebugSteps() {
+            return debugSteps;
+        }
 
 };
 
