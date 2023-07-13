@@ -3,7 +3,6 @@
 
 #include "Utils.hpp"
 #include "Frame.hpp"
-#include "opencv2/calib3d.hpp"
 #include "Camera.hpp"
 
 struct Pose {
@@ -69,7 +68,7 @@ class _3DHandler {
             * @param: E: fundamental matrix of type cv::Mat
             * @return: bool: true if fundamental matrix is computed successfully, false otherwise
         */
-        bool getEssentialMatrix(const std::vector<cv::DMatch> &matches, Frame::Ptr srcFrame, Frame::Ptr dstFrame, cv::Mat &E);
+        bool getEssentialMatrix(const std::vector<cv::DMatch> &matches,const Frame::Ptr srcFrame,const Frame::Ptr dstFrame, cv::Mat &E);
 
         /*
             *@brief: Given set of matches, compute the pose of the destination frame with respect to the source frame
@@ -90,7 +89,7 @@ class _3DHandler {
             *@param: pnts3D: 3D points of type cv::Mat
             *@return: bool: true if 3D points are computed successfully, false otherwise
         */
-        bool triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches, cv::Mat &pnts3D);
+        bool triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches);
 
         /*
             *@brief: Linear Triangulation of single 3d point from two views
@@ -100,7 +99,7 @@ class _3DHandler {
             *@return: bool: true if 3D point is computed successfully, false otherwise
         
         */
-        bool triangulePoint(const std::vector<Sophus::SE3d> &poses,
+        bool triangulatePoint(const std::vector<Sophus::SE3d> &poses,
                    const std::vector<Vec3> lrPoints, Vec3 &_3DPoint);
         
         
@@ -125,7 +124,7 @@ class _3DHandler {
         // cv::Mat rotateMatrixZ(int rotateAngle);
         // double getMeanVar(std::vector<double> &vec);
 
-        ~_3DHandler();
+        ~_3DHandler() {}
 };
 
 #endif // TODOITEM_H

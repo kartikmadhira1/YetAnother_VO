@@ -20,20 +20,46 @@ class Frame  {
         // mappoint ID -> mappoint
         std::map<unsigned long, MapPoint::Ptr> obsMapPoints;
         cv::Mat rawImg;
+        Intrinsics::Ptr intrinsics;
+        std::vector<cv::DMatch> LRmatches;
+        // std::vector<cv::DMatch> LRmatches;
     public:
         typedef std::shared_ptr<Frame> Ptr;
-        typedef std::shared_ptr<Frame> RightPtr;
+        Frame::Ptr rightFrame;
 
         Frame() {}
-        Frame(unsigned long _frameID, Sophus::SE3d _pose, std::vector<cv::KeyPoint> _keypoints, cv::Mat _descriptors) {
+
+
+        Frame(unsigned long _frameID, Sophus::SE3d _pose, std::vector<cv::KeyPoint> _keypoints, cv::Mat _descriptors, Intrinsics::Ptr _intrinsics, std::vector<cv::DMatch> _LRmatches) {
             frameID = _frameID;
             pose = _pose;
             keypoints = _keypoints;
             descriptors = _descriptors;
+            intrinsics = _intrinsics;
+            rightFrame = nullptr;
+            LRmatches = _LRmatches;
         }
-        
+
         Sophus::SE3d getPose() {
             return pose;
+        }
+
+        /*
+        This is to get the pose of the right frame wrt the left frameo or if seen from the left frame what is 
+        the pose of the right frame.
+        */
+        Sophus::SE3d getRightPoseInWorldFrame() {
+            // get sophus matrix from Eigen
+            Eigen::Matrix4d poseMat;
+            poseMat << 1, 0, 0, intrinsics->Right.getBaseline(), 
+                       0, 1, 0, 0,
+                       0, 0, 1, 0, 
+                       0, 0 ,0 ,1;
+
+            Sophus::SE3d returnPose(poseMat*this->pose.matrix());
+
+            return returnPose;
+
         }
 
         void setPose(Sophus::SE3d _pose) {
@@ -76,6 +102,14 @@ class Frame  {
 
         cv::Mat getRawImg() {
             return rawImg;
+        }
+
+        std::vector<cv::DMatch> getLRMatches() {
+            return LRmatches;
+        }
+
+        std::vector<cv::KeyPoint> getKeypoints() {
+            return keypoints;
         }
 
 };

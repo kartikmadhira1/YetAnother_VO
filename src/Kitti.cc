@@ -21,7 +21,12 @@ void KITTI::loadConfig(std::string &_path) {
     this->seqNo = value["sequence"].asString();
     this->calibPath = this->basePath  + this->seqNo + "/calib.txt";
     this->camType = value["cameraType"].asString();
-    this->debugMode = value["debug"].asString() == "true" ? true : false;
+    
+    if (value["debugMode"].asString() == "true") {
+        this->debugMode = true;
+    } else {
+        this->debugMode = false;
+    }
     if (this->camType == "mono") {
         this->leftImagesPath = this->basePath + this->seqNo + "/image_0/";
         // rightImagesPath = basePath + seqNo + "/images_1/";
@@ -32,9 +37,9 @@ void KITTI::loadConfig(std::string &_path) {
         this->rightImagesPath = this->basePath + this->seqNo + "/image_1/";
     }
     if (value["useCUDA"].asString() == "true") {
-        this->cudaSet = "true";
+        this->cudaSet = true;
     } else {
-        this->cudaSet = "false";
+        this->cudaSet = false;
     }
 
     this->debugSteps = value["debugSteps"].asUInt64();

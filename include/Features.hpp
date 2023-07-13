@@ -69,8 +69,9 @@ class Features {
             } catch(cv::Exception &e) {
                 LOG(ERROR) << "Exception in Initializing feature Matcher";
                 std::cout << "Exception in Initializing feature Matcher" << std::endl;
+                return false;
             }
-
+            return true;
         }
     public:
         Features() {}
@@ -144,6 +145,17 @@ class Features {
         void convertGPUKpts(std::vector<cv::KeyPoint> &keypoints, cv::cuda::GpuMat &keypointsGPU) {
             detectorGPU->convert(keypointsGPU, keypoints);
         }
+
+        bool gpuStatus() {
+            return isGPU;
+        }
+
+        // void getFeatures(cv::cuda::GpuMat &img, cv::vector<KeyPoints> &keypoints, cv::Mat &descriptors) {
+        //     detectorGPU->detectAndComputeAsync(img, cv::cuda::GpuMat(), keypoints, descriptors);
+        // }
+
+
+
         typedef std::shared_ptr<Features<T>> Ptr;
 
 };

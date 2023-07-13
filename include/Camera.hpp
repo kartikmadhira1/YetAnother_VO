@@ -40,7 +40,7 @@ struct Camera {
         float getCy() {
             return K.at<double>(1,2);
         }
-        float getBaseline() {
+        double getBaseline() {
             double baseline = -P.at<double>(0,3)/P.at<double>(0,0);
             return baseline;
         }

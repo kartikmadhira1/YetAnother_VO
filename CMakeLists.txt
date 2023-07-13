@@ -60,11 +60,14 @@ PATH_SUFFIXES lib)
 
 
 add_executable(
-  yavio2 include/VO.cc src/Utils.cc src/Kitti.cc src/Viz.cc src/Map.cc include/Frame.hpp include/MapPoint.hpp include/Features.hpp 
+  yavio2 include/VO.cc src/Utils.cc src/Kitti.cc src/3DHandler.cc src/Viz.cc src/Map.cc include/Frame.hpp include/MapPoint.hpp include/Features.hpp 
 )
 target_link_libraries(
-    yavio2 PRIVATE Iconv::Iconv jsoncpp_lib ${OpenCV_LIBS} ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
-    glog::glog)
+    yavio2 PRIVATE Iconv::Iconv jsoncpp_lib opencv_calib3d ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES} ${OpenCV_LIBS}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
+    glog::glog 
+    nvToolsExt
+    opencv_cudafeatures2d
+  )
 
 
 # add_executable(
@@ -95,6 +98,16 @@ target_link_libraries(
   DataHandlerTest
   GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS} glog::glog
 )
+
+add_executable(
+  FrameTest tests/FrameTest.cc src/Kitti.cc src/Utils.cc include/Frame.hpp
+)
+target_link_libraries(
+  FrameTest
+  GTest::gtest_main jsoncpp_lib ${Boost_LIBRARIES} ${OpenCV_LIBS} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES}  glog::glog
+)
+
+
 
 add_executable(
   FeaturesTest tests/FeaturesTest.cc src/Kitti.cc src/Utils.cc  include/Features.hpp)

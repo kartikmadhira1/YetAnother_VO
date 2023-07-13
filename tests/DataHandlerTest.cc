@@ -5,16 +5,8 @@
 
  
 TEST(DataHandlerCheck, checkInstrinsicIntegrity) {
-    //get current datetime
-    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-    // convert to string
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    std::string now_str = std::ctime(&now_c);
-    std::string logPath = "/home/kartik/devel/projects/YA_VO_2/logs/" + now_str + "_DataHandlerTests.log";
-    google::SetLogDestination(0, logPath.c_str());
-    // google::SetLogDestination(google::WARNING,"");
-    google::InitGoogleLogging("DataHandlerTest");
-    std::string configPath = "/home/kartik/devel/projects/YA_VO_2/config/KITTI_stereo.json";
+  
+    std::string configPath = "../config/KITTI_stereo.json";
     KITTI kitti(configPath);
 
     Intrinsics::Ptr intrinsics = std::make_shared<Intrinsics>();
@@ -35,9 +27,8 @@ TEST(DataHandlerCheck, checkInstrinsicIntegrity) {
 
 
 TEST(DataHandlerCheck, checkFilename) {
-    std::string configPath = "/home/kartik/devel/projects/YA_VO_2/config/KITTI_stereo.json";
+    std::string configPath = "../config/KITTI_stereo.json";
     KITTI kitti(configPath);
-    kitti.generatePathTrains();
     std::cout << kitti.getTotalFrames() << std::endl;
     for (int i=0; i<20; i++) {
         std::string leftName = kitti.getCurrImagePath(CameraSide::LEFT);

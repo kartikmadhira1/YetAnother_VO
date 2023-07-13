@@ -23,6 +23,7 @@
 #include "opencv4/opencv2/core.hpp"
 #include "opencv4/opencv2/core/eigen.hpp"
 #include <opencv4/opencv2/cudaimgproc.hpp>
+#include <opencv4/opencv2/calib3d.hpp>
 
 
 // common typedefs

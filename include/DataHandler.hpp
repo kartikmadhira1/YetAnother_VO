@@ -20,6 +20,11 @@ class DataHandler {
         virtual cv::Mat getNextData(CameraSide cam) = 0;
         virtual Intrinsics::Ptr getCalibParams() = 0;
         virtual void loadConfig(std::string &path) = 0;
+        virtual std::string getBasePath() = 0;
+        virtual bool getDebugMode() = 0;
+        virtual unsigned long getDebugSteps() = 0;
+        virtual bool isCudaSet() = 0;
+        virtual int getTotalFrames() = 0;
         typedef std::shared_ptr<DataHandler> Ptr;
 };
 
@@ -43,7 +48,7 @@ class KITTI : public DataHandler {
         std::vector<std::string>::iterator leftImageTrainIt;
         std::vector<std::string>::iterator rightImageTrainIt;
         std::string camType;
-        std::string cudaSet;
+        bool cudaSet;
         bool isStereo;
         bool debugMode;
         unsigned long debugSteps;
@@ -54,6 +59,7 @@ class KITTI : public DataHandler {
         KITTI(std::string &_configPath) {
             currFrameId = 0;
             loadConfig(_configPath);
+            generatePathTrains();
         }
         void generatePathTrains();
         std::string getBasePath() {
@@ -74,6 +80,10 @@ class KITTI : public DataHandler {
 
         unsigned long getDebugSteps() {
             return debugSteps;
+        }
+
+        bool isCudaSet() {
+            return cudaSet;
         }
 
 };

@@ -7,15 +7,8 @@
  
 TEST(FeaturesCheck, checkMatchingAlgoGPU) {
     //get current datetime
-    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-    // convert to string
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    std::string now_str = std::ctime(&now_c);
-    std::string logPath = "/home/kartik/devel/projects/YA_VO_2/logs/" + now_str + "_FeaturesTest.log";
-    google::SetLogDestination(0, logPath.c_str());
-    // google::SetLogDestination(google::WARNING,"");
-    google::InitGoogleLogging("DataHandlerTest");
-    std::string configPath = "/home/kartik/devel/projects/YA_VO_2/config/KITTI_stereo.json";
+    std::string configPath = "../config/KITTI_stereo.json";
+
     KITTI kitti(configPath);
     kitti.generatePathTrains();
     // cv::cuda::Stream stream;
@@ -50,9 +43,9 @@ TEST(FeaturesCheck, checkMatchingAlgoGPU) {
 
 TEST(FeaturesCheck, checkOutlierRemoval) {
 
-    std::string configPath = "/home/kartik/devel/projects/YA_VO_2/config/KITTI_stereo.json";
+    std::string configPath = "../config/KITTI_stereo.json";
     KITTI kitti(configPath);
-    kitti.generatePathTrains();
+    // kitti.generatePathTrains();
     // cv::cuda::Stream stream;
     // get time in between
     Features<cv::cuda::GpuMat>::Ptr features = std::make_shared<Features<cv::cuda::GpuMat>>(DetectorType::ORB, DescriptorType::BRIEF);
@@ -68,6 +61,7 @@ TEST(FeaturesCheck, checkOutlierRemoval) {
     features->detectFeatures(leftImgGpu, kp1, desc1);
     features->detectFeatures(rightImgGpu, kp2, desc2);
 
+    features->gpuStatus();
    
 
     std::vector<cv::DMatch> matches;

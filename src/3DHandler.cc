@@ -2,12 +2,12 @@
 
 
 
-bool _3DHandler::getEssentialMatrix(std::vector<cv::DMatch> &matches, Frame::Ptr srcFrame, Frame::Ptr dstFrame, cv::Mat &F) {
+bool _3DHandler::getEssentialMatrix(const std::vector<cv::DMatch> &matches, const Frame::Ptr srcFrame, const Frame::Ptr dstFrame, cv::Mat &E) {
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
     for (auto &match : matches) {
-        srcPts.push_back(srcFrame->keypoints[match.queryIdx].pt);
-        dstPts.push_back(dstFrame->keypoints[match.trainIdx].pt);
+        srcPts.push_back(srcFrame->getKeypoints()[match.queryIdx].pt);
+        dstPts.push_back(dstFrame->getKeypoints()[match.trainIdx].pt);
     }
 
     double focal = this->intrinsics->Left.getF();
@@ -17,12 +17,13 @@ bool _3DHandler::getEssentialMatrix(std::vector<cv::DMatch> &matches, Frame::Ptr
 
     // WARNING : Essential matrix is from dstFrame to srcFrame
     // this way we get pose of frame 2 in frame 1
+    cv::Mat mask;
     try {    
         E = cv::findEssentialMat(dstPts, srcPts, focal, principalPoint, cv::RANSAC, 0.999, 1.0, mask);
     } catch (const std::exception &e) {
         LOG(ERROR) << "Exception in findEssentialMat: " << e.what();
         LOG(ERROR) << "srcPts: " << srcPts.size() << " dstPts: " << dstPts.size();
-        LOG(ERROR) << "srcFrame->keypoints: " << srcFrame->keypoints.size() << " dstFrame->keypoints: " << dstFrame->keypoints.size();
+        LOG(ERROR) << "srcFrame->keypoints: " << srcFrame->getKeypoints().size() << " dstFrame->keypoints: " << dstFrame->getKeypoints().size();
         return false;
     }
     return true;
@@ -34,8 +35,8 @@ bool _3DHandler::getPoseFromEssential(const cv::Mat &E, const std::vector<cv::DM
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
     for (auto &match : matches) {
-        srcPts.push_back(srcFrame->keypoints[match.queryIdx].pt);
-        dstPts.push_back(dstFrame->keypoints[match.trainIdx].pt);
+        srcPts.push_back(srcFrame->getKeypoints()[match.queryIdx].pt);
+        dstPts.push_back(dstFrame->getKeypoints()[match.trainIdx].pt);
     }
 
     double focal = this->intrinsics->Left.getF();
@@ -50,56 +51,12 @@ bool _3DHandler::getPoseFromEssential(const cv::Mat &E, const std::vector<cv::DM
     } catch (const std::exception &e) {
         LOG(ERROR) << "Exception in recoverPose: " << e.what();
         LOG(ERROR) << "srcPts: " << srcPts.size() << " dstPts: " << dstPts.size();
-        LOG(ERROR) << "srcFrame->keypoints: " << srcFrame->keypoints.size() << " dstFrame->keypoints: " << dstFrame->keypoints.size();
+        LOG(ERROR) << "srcFrame->keypoints: " << srcFrame->getKeypoints().size() << " dstFrame->keypoints: " << dstFrame->getKeypoints().size();
         return false;
     }
     pose = Pose(R, t, this->intrinsics->Left.getK());    
     
     return true;
-}
-
-// trinagulation after creating Map and MapPoints
-
-bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches, cv::Mat &pnts3D) {
-    
-    // set poses for both views
-    std::vector<Sophus::SE3d> poses{srcFrame->pose, dstFrame->pose};
-
-    std::vector<cv::Point2f> srcPts;
-    std::vector<cv::Point2f> dstPts;
-
-    if (matches.size() < 4) {
-        LOG(ERROR) << "Not enough matches to triangulate";
-        return false;
-    }
-
-
-    int landmarkCount = 0;
-    for (auto &match : matches) {
-        // get the keypoints that have been matched
-        std::vector<Vec3> points {
-            this->intrinsics->Left.pixel2camera(cv::Point(srcFrame->keypoints[match.queryIdx].pt));
-            this->intrinsics->Left.pixel2camera(cv::Point(dstFrame->keypoints[match.trainIdx].pt));
-        }
-        Vec3 pWorld = Vec3::Zero();
-        if (triangulatePoint(poses, points, pWorld) && pWorld[2] > 0) {
-            // update landmark count
-            landmarkCount++;
-            // add the 3d point to the map
-            auto newMapPoint = std::make_shared<MapPoint>(MapPoint::createMapPointID(), pWorld);
-            // register the features that led to creation of this 3d point
-            newMapPoint->addObservation(srcFrame->getFrameID(), match.queryIdx);
-            newMapPoint->addObservation(dstFrame->getFrameID(), match.trainIdx);
-
-            // add the 3d point to the frame observations
-            srcFrame->addMapPoint(newMapPoint);
-            dstFrame->addMapPoint(newMapPoint);
-
-            // add the 3d point to the map itself??????*******************  
-        }          
-    }
-    LOG(INFO) << "Triangulated: " << landmarkCount << " points";
-    LOG(INFO) << "Total Matches: " << matches.size();
 }
 
 
@@ -123,3 +80,55 @@ inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
     }
     return false;
 }
+
+
+
+
+
+
+// trinagulation after creating Map and MapPoints
+
+bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches) {
+    
+    // set poses for both views
+    std::vector<Sophus::SE3d> poses{srcFrame->getPose(), srcFrame->getRightPoseInWorldFrame()};
+
+    std::vector<cv::Point2f> srcPts;
+    std::vector<cv::Point2f> dstPts;
+
+    if (matches.size() < 4) {
+        LOG(ERROR) << "Not enough matches to triangulate";
+        return false;
+    }
+
+
+    int landmarkCount = 0;
+    for (auto &match : matches) {
+        // get the keypoints that have been matched
+        std::vector<Vec3> points {
+            this->intrinsics->Left.pixel2camera(cv::Point(srcFrame->getKeypoints()[match.queryIdx].pt)),
+            this->intrinsics->Left.pixel2camera(cv::Point(dstFrame->getKeypoints()[match.trainIdx].pt))
+        };
+        Vec3 pWorld = Vec3::Zero();
+        if (triangulatePoint(poses, points, pWorld) && pWorld[2] > 0) {
+            // update landmark count
+            landmarkCount++;
+            // add the 3d point to the map
+            auto newMapPoint = std::make_shared<MapPoint>(MapPoint::createMapPointID(), pWorld);
+            // register the features that led to creation of this 3d point
+            newMapPoint->addObservation(srcFrame->getFrameID(), match.queryIdx);
+            newMapPoint->addObservation(dstFrame->getFrameID(), match.trainIdx);
+
+            // add the 3d point to the frame observations
+            srcFrame->addObservation(newMapPoint);
+            dstFrame->addObservation(newMapPoint);
+
+            // add the 3d point to the map itself??????*******************  
+        }          
+    }
+    LOG(INFO) << "Triangulated: " << landmarkCount << " points";
+    LOG(INFO) << "Total Matches: " << matches.size();
+    return true;
+}
+
+
