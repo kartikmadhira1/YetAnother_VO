@@ -5,5 +5,5 @@
     "calibPath" : "calib.txt",
     "useCUDA" : "true",
     "debugMode": "true",
-    "debugSteps" : 1 //number of frames to run in debug mode
+    "debugSteps" : 2 //number of frames to run in debug mode
 }

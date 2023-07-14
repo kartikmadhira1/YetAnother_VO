@@ -48,6 +48,7 @@ void Viewer::plotterLoop() {
 
     const float blue[3] = {0, 0, 1};
     const float green[3] = {0, 1, 0};
+    const float red[3] = {1.0, 0, 0};
 
     while (!pangolin::ShouldQuit() && viewerRunning) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -57,20 +58,21 @@ void Viewer::plotterLoop() {
         std::unique_lock<std::mutex> lock(viewerMutex);
         if (currentFrame) {
             drawFrame(currentFrame, green);
+            drawFrame(currentFrame->rightFrame, blue);
+
             followCurrentFrame(visCamera);
 
-            cv::Mat img = plotFromImage();
-            cv::imshow("image", img);
-            cv::waitKey(1);
+            // cv::Mat img = plotFromImage();
+            // cv::imshow("image", img);
+            // cv::waitKey(1);
         }
-        const float red[3] = {1.0, 0, 0};
         for (auto &eachFrame : frames) {
             drawFrame(eachFrame.second, red);
         }
 
-        // if (map) {
-        //     drawMPs();
-        // }
+        if (map) {
+            drawMPs();
+        }
 
         pangolin::FinishFrame();
         usleep(500);

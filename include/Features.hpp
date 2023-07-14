@@ -119,6 +119,12 @@ class Features {
             detectorGPU->empty();
             detectorGPU->convert(keypoints1, kp1CPU);
             detectorGPU->convert(keypoints2, kp2CPU);
+            // what are the sizes of kp1 and kp2 and the corresponding cpu versions
+            std::cout << "kp1CPU size: " << kp1CPU.size() << std::endl;
+            std::cout << "kp2CPU size: " << kp2CPU.size() << std::endl;
+            std::cout << "kp1GPU size: " << keypoints1.size() << std::endl;
+            std::cout << "kp2GPU size: " << keypoints2.size() << std::endl;
+
             cv::drawMatches(Img1CPU, kp1CPU, Img2CPU, kp2CPU, matches, outImg);
         }
 

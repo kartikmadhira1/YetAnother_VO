@@ -28,6 +28,9 @@ TEST(FeaturesCheck, checkMatchingAlgoGPU) {
     features->detectFeatures(leftImgGpu, kp1, desc1);
     features->detectFeatures(rightImgGpu, kp2, desc2);
 
+    // what are the sizes of kp1 and kp2 and the corresponding cpu versions
+
+
     std::vector<cv::DMatch> matches;
     features->matchFeatures(desc1, desc2, matches);
         // get time in between

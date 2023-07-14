@@ -60,13 +60,14 @@ PATH_SUFFIXES lib)
 
 
 add_executable(
-  yavio2 include/VO.cc src/Utils.cc src/Kitti.cc src/3DHandler.cc src/Viz.cc src/Map.cc include/Frame.hpp include/MapPoint.hpp include/Features.hpp 
+  yavio2 include/VO.cc src/Utils.cc src/Kitti.cc src/3DHandler.cc src/Viz.cc src/Map.cc include/Frame.hpp include/MapPoint.hpp include/Features.hpp include/OptFlow.hpp
 )
 target_link_libraries(
     yavio2 PRIVATE Iconv::Iconv jsoncpp_lib opencv_calib3d ${Boost_LIBRARIES} ${Pangolin_LIBRARIES} ${OPENGL_LIBRARIES} ${OpenCV_LIBS}  ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIB} ${G2O_STUFF_LIBRARY} ${G2O_LIBRARIES}
     glog::glog 
     nvToolsExt
     opencv_cudafeatures2d
+    opencv_cudaoptflow
   )
 
 

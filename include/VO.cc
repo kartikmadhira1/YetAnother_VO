@@ -8,6 +8,7 @@
 #include "Features.hpp"
 #include "Viz.hpp"
 #include "Map.hpp"
+#include "OptFlow.hpp"
 
 
 enum dataset {kitti, tum, euroc};
@@ -23,7 +24,6 @@ class VO {
         Map::Ptr map;
         Intrinsics::Ptr intrinsics;
         DataHandler::Ptr dataHandler;
-        Viewer::Ptr viewer;
         typename Features<T>::Ptr featureDetector;
         // Features<c>::Ptr featureDetector;
         _3DHandler::Ptr Handler3D;
@@ -33,8 +33,13 @@ class VO {
         unsigned long debugSteps;
         Frame::Ptr currFrame;
         Frame::Ptr prevFrame;
+        Sophus::SE3d relativeMotion;
+        OptFlow::Ptr optFlow;
 
     public:
+        // viewer thread has to be in main thread
+        Viewer::Ptr viewer;
+
         VO( std::string &configFile, dataset datasetType) {
             // initialize glog
             initLogging();
@@ -82,6 +87,10 @@ class VO {
             intrinsics = dataHandler->getCalibParams();
             map = std::make_shared<Map>();
             Handler3D = std::make_shared<_3DHandler>(intrinsics);
+            map = std::make_shared<Map>();
+            viewer = std::make_shared<Viewer>();
+            viewer->setMap(map);
+            optFlow = std::make_shared<OptFlow>();
 
         }
 
@@ -109,9 +118,6 @@ class VO {
             }
         }
 
-       
-
-
         bool takeVOStep() {
             Frame::Ptr frame = prepNextFrame();
 
@@ -129,14 +135,64 @@ class VO {
                 if (prevFrame == nullptr) {
                     bool success = buildInitMap();
                     if (success) {
+                        // update map
+                        map->insertKeyFrame(currFrame);
+                        map->insertKeyFrame(currFrame->rightFrame);
+                        viewer->addCurrentFrame(currFrame);
+                        viewer->updateMap();
                         status = voStatus::TRACKING;
+                        prevFrame = currFrame;
                     } else {
-                        
+                        LOG(ERROR) << "Map initialization failed for frame ID: " << currFrame->getFrameID();
+                        status = voStatus::INIT;
                     }
                 }
+            } else if (status == voStatus::TRACKING) {
+                // 1. Calculate the approximate pose of this new frame based on relative velocity.
+                // 2. reproject 3d points on to the current frame.
+                // 3. Calculate the optical flow last frame to current frame 
+                // 4. Find how many points are inliers, if less than 20%, register frame as a keyframe and project new points.
+                        // Q - Should the outlier be added as new 3d points?
+                // 5. If more than 20% points are inliers, register frame as regular frame, update the mapPoint with new observation and update frame with observation
+                if (prevFrame != nullptr) {
+                    frame->setPose(relativeMotion*prevFrame->getPose());
+                }
+
+                // track the 3d points to current frame
+                int optFlowInlierCount = track();
+
+                // // calculate optical flow and see how many inliers are there, if too less inliers then tracking is bad
+                // std::vector<cv::Point2f> prevPt, currPt;
+                // cv::KeyPoint::convert(prevFrame->getKeypoints(), prevPt);
+                // cv::KeyPoint::convert(currFrame->getKeypoints(), currPt);
+                // optFlow->getOptFlow(prevFrame, currFrame, prevPt, currPt);
+                // std::vector<uchar> flowStatus = optFlow->getFlowStatus();
+                
+
+
             }
+
+
         
         }
+
+        int track() {
+            // reproject all the 3d points seen in previous frame to the current frame
+
+            auto obsMapPoints = prevFrame->getObsMapPoints();
+            std::vector<cv::Point2f> prevPts, currPts;
+            for (auto &obsMapPoint : obsMapPoints) {
+                cv::KeyPoint singePrevPt =  prevFrame->getKeypoints()[obsMapPoint.second->getKpID(prevFrame->getFrameID)].pt;
+                
+                // now get 3d location of this mapPoint and reproject it to the current frame
+                Vec3 mapPoint3D = obsMapPoint.second->getPosition();
+                
+
+            }
+
+
+        }
+
 
         Frame::Ptr prepNextFrame() {
             // get left and right images
@@ -169,19 +225,13 @@ class VO {
                 descriptors1.download(matDescriptors1);
                 descriptors2.download(matDescriptors2);
             } else {
-                
-                // featureDetector->detectFeatures(cvleftImage, keyPoints1, matDescriptors1);
-                // featureDetector->detectFeatures(cvrightImage, keyPoints2, matDescriptors2);
-                // featureDetector->matchFeatures(matDescriptors1, matDescriptors2, matches);
-                // featureDetector->removeOutliers(matches, filteredMatches);
                 LOG(ERROR) << "CPU framePrep not implemented yet";
             }
 
-            Frame::Ptr leftFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints1, matDescriptors1, this->intrinsics, filteredMatches);
-            Frame::Ptr rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints2, matDescriptors2, this->intrinsics, filteredMatches);
-
-
+            Frame::Ptr leftFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints1, matDescriptors1, this->intrinsics, filteredMatches, cvleftImage);
+            Frame::Ptr rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints2, matDescriptors2, this->intrinsics, filteredMatches, cvrightImage);
             leftFrame->rightFrame = rightFrame;
+
             return leftFrame;
         }
 
@@ -194,12 +244,29 @@ class VO {
         bool buildInitMap() {
             // Triangulate points based on the LR stereo images
             std::vector<cv::DMatch> matches = currFrame->getLRMatches();
-            Handler3D->triangulateAll(currFrame, currFrame->rightFrame, matches);
+            bool ret = Handler3D->triangulateAll(currFrame, currFrame->rightFrame, matches);
+             currFrame->rightFrame->setPose(currFrame->getRightPoseInWorldFrame());
 
+            if (!ret) {
+                return false;
+            }
+            // update map with all 3d points 
+            insertMPfromFrame(currFrame);
+            LOG(INFO) << "Map initialized";
+            return true;
         }
+
+        void insertMPfromFrame(Frame::Ptr frame) {
+            auto obsMapPoints = frame->getObsMapPoints();
+            for (auto &obsMapPoint : obsMapPoints) {
+                map->insertMapPoint(obsMapPoint.second);
+            }
+        }
+
+
+
         bool voLoop();
 
-        
 
 };
 
@@ -216,6 +283,10 @@ int main() {
     google::InitGoogleLogging("YET_ANOTHER_VO");
     std::string configFile = "../config/KITTI_stereo.json";
     VO<cv::cuda::GpuMat> vo(configFile, dataset::kitti);
-    vo.runVO();
+
+    // vo.runVO();
+      // Lh.viz->viewerThread = std::thread(std::bind(&Viewer::plotterLoop, Lh.viz));
+    std::thread VOThread = std::thread(std::bind(&VO<cv::cuda::GpuMat>::runVO, vo));
+    vo.viewer->viewerRun();
     return 0;
 }

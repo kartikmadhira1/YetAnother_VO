@@ -23,6 +23,8 @@ class Frame  {
         Intrinsics::Ptr intrinsics;
         std::vector<cv::DMatch> LRmatches;
         // std::vector<cv::DMatch> LRmatches;
+        std::mutex poseMutex; //lock whenever accesing/writing to the object.
+
     public:
         typedef std::shared_ptr<Frame> Ptr;
         Frame::Ptr rightFrame;
@@ -30,7 +32,7 @@ class Frame  {
         Frame() {}
 
 
-        Frame(unsigned long _frameID, Sophus::SE3d _pose, std::vector<cv::KeyPoint> _keypoints, cv::Mat _descriptors, Intrinsics::Ptr _intrinsics, std::vector<cv::DMatch> _LRmatches) {
+        Frame(unsigned long _frameID, Sophus::SE3d _pose, std::vector<cv::KeyPoint> _keypoints, cv::Mat _descriptors, Intrinsics::Ptr _intrinsics, std::vector<cv::DMatch> _LRmatches, cv::Mat _rawImg) {
             frameID = _frameID;
             pose = _pose;
             keypoints = _keypoints;
@@ -38,6 +40,7 @@ class Frame  {
             intrinsics = _intrinsics;
             rightFrame = nullptr;
             LRmatches = _LRmatches;
+            rawImg = _rawImg;
         }
 
         Sophus::SE3d getPose() {
@@ -49,9 +52,11 @@ class Frame  {
         the pose of the right frame.
         */
         Sophus::SE3d getRightPoseInWorldFrame() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+
             // get sophus matrix from Eigen
             Eigen::Matrix4d poseMat;
-            poseMat << 1, 0, 0, intrinsics->Right.getBaseline(), 
+            poseMat << 1, 0, 0, -intrinsics->Right.getBaseline(), 
                        0, 1, 0, 0,
                        0, 0, 1, 0, 
                        0, 0 ,0 ,1;
@@ -63,14 +68,19 @@ class Frame  {
         }
 
         void setPose(Sophus::SE3d _pose) {
-            this->pose = pose;
+            std::unique_lock<std::mutex> lock(poseMutex);
+
+            this->pose = _pose;
         }
 
         unsigned long getFrameID() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+
             return frameID;
         }
 
         bool updateMatchesMap (unsigned long _frameID, std::vector<cv::DMatch> &matches) {
+            std::unique_lock<std::mutex> lock(poseMutex);
             std::vector<int> src;
             std::vector<int> dst;
             for (auto &match : matches) {
@@ -93,6 +103,7 @@ class Frame  {
 
         // add observation/3D points to the frame
         void addObservation(MapPoint::Ptr mapPoint) {
+            std::unique_lock<std::mutex> lock(poseMutex);
             if (obsMapPoints.find(mapPoint->getMapPointID()) != obsMapPoints.end()) {
                 LOG(ERROR) << "Frame ID: " << frameID << " already has a map point ID: " << mapPoint->getMapPointID();
                 return;
@@ -101,17 +112,25 @@ class Frame  {
         }
 
         cv::Mat getRawImg() {
+            std::unique_lock<std::mutex> lock(poseMutex);
             return rawImg;
         }
 
         std::vector<cv::DMatch> getLRMatches() {
+            std::unique_lock<std::mutex> lock(poseMutex);
             return LRmatches;
         }
 
         std::vector<cv::KeyPoint> getKeypoints() {
+            std::unique_lock<std::mutex> lock(poseMutex);
             return keypoints;
         }
 
+        
+        std::map<unsigned long, MapPoint::Ptr> getObsMapPoints() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            return obsMapPoints;
+        }
 };
 
 #endif

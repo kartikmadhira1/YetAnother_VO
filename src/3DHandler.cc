@@ -91,8 +91,8 @@ inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
 bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches) {
     
     // set poses for both views
+    std::cout << srcFrame->getFrameID() << " " << dstFrame->getFrameID() << std::endl;
     std::vector<Sophus::SE3d> poses{srcFrame->getPose(), srcFrame->getRightPoseInWorldFrame()};
-
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
 

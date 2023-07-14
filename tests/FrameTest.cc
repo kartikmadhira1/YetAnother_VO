@@ -22,8 +22,8 @@ TEST(FramesCheck, checkPoses) {
     // unsigned long frameId = Frame::s
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
     std::vector<cv::DMatch> matches;
-    Frame::Ptr frame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keypoints1, cv::Mat(), kitti.getCalibParams(), matches);
-    Frame::Ptr rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keypoints2, cv::Mat(), kitti.getCalibParams(), matches);
+    Frame::Ptr frame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keypoints1, cv::Mat(), kitti.getCalibParams(), matches, cv::Mat());
+    Frame::Ptr rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keypoints2, cv::Mat(), kitti.getCalibParams(), matches, cv::Mat());
     frame->rightFrame = rightFrame;
     std::cout << frame->getRightPoseInWorldFrame().matrix() << std::endl;
     // std::cout << Sophus::SE3d().matrix() << std::endl;
