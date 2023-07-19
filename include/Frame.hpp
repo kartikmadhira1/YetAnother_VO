@@ -79,6 +79,17 @@ class Frame  {
             return frameID;
         }
 
+        void clearKeypoints() {
+            this->keypoints.clear();
+        }
+
+        void addKeypoint(const cv::KeyPoint &kp) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            this->keypoints.push_back(kp);  
+        }
+
+
+
         bool updateMatchesMap (unsigned long _frameID, std::vector<cv::DMatch> &matches) {
             std::unique_lock<std::mutex> lock(poseMutex);
             std::vector<int> src;
@@ -130,6 +141,16 @@ class Frame  {
         std::map<unsigned long, MapPoint::Ptr> getObsMapPoints() {
             std::unique_lock<std::mutex> lock(poseMutex);
             return obsMapPoints;
+        }
+
+        cv::Point2f world2pixel(const Vec3 &pWorld, const Intrinsics::Ptr intrinsics) {
+            Eigen::Matrix<double, 4, 1> homo3DPt;
+            homo3DPt << pWorld.coeff(0), pWorld.coeff(1), pWorld.coeff(2), 1;
+            Eigen::Matrix3d K;
+            intrinsics->Left.getKEigen(K);
+            Vec3 camPoints = K*this->pose.matrix3x4()*homo3DPt;
+
+            return cv::Point2f(camPoints.coeff(0)/camPoints.coeff(2), camPoints.coeff(1)/camPoints.coeff(2));
         }
 };
 

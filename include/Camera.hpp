@@ -22,6 +22,19 @@ struct Camera {
         cv::Mat getK() {
             return K;
         }
+
+        bool getKEigen(Eigen::Matrix3d &K) {
+            try {
+                cv::cv2eigen(this->K, K);
+            } catch (const cv::Exception& e) {
+                LOG(ERROR) << "Could not convert K to Eigen matrix with error: " << e.what();
+                LOG(ERROR) << "Exception caught: " << e.what();
+                return false;
+            }
+            return true;
+        }
+
+
         cv::Mat getP() {
             return P;
         }

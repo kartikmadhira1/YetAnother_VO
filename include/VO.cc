@@ -153,27 +153,30 @@ class VO {
                 // 3. Calculate the optical flow last frame to current frame 
                 // 4. Find how many points are inliers, if less than 20%, register frame as a keyframe and project new points.
                         // Q - Should the outlier be added as new 3d points?
-                // 5. If more than 20% points are inliers, register frame as regular frame, update the mapPoint with new observation and update frame with observation
+
+                LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " is a entering TRACKING state";
                 if (prevFrame != nullptr) {
-                    frame->setPose(relativeMotion*prevFrame->getPose());
+                    currFrame->setPose(relativeMotion*prevFrame->getPose());
                 }
 
-                // track the 3d points to current frame
+                // log current frame pose
+                LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has pose: " << currFrame->getPose().matrix3x4();
+
+                // 5. If more than 20% points are inliers, register frame as regular frame, update the mapPoint with new observation and update frame with observation
                 int optFlowInlierCount = track();
 
-                // // calculate optical flow and see how many inliers are there, if too less inliers then tracking is bad
-                // std::vector<cv::Point2f> prevPt, currPt;
-                // cv::KeyPoint::convert(prevFrame->getKeypoints(), prevPt);
-                // cv::KeyPoint::convert(currFrame->getKeypoints(), currPt);
-                // optFlow->getOptFlow(prevFrame, currFrame, prevPt, currPt);
-                // std::vector<uchar> flowStatus = optFlow->getFlowStatus();
-                
-
+                //6. If inliers not enough, mask the points that are now features and detect new features that are masked with the already detected features
+                relativeMotion = currFrame->getPose()*prevFrame->getPose().inverse();
+                map->insertKeyFrame(currFrame);
+                map->insertKeyFrame(currFrame->rightFrame);
+                viewer->addCurrentFrame(currFrame);
+                viewer->updateMap();
+                status = voStatus::TRACKING;
+                prevFrame = currFrame;
 
             }
 
 
-        
         }
 
         int track() {
@@ -181,17 +184,51 @@ class VO {
 
             auto obsMapPoints = prevFrame->getObsMapPoints();
             std::vector<cv::Point2f> prevPts, currPts;
+            std::vector<int> mapPointIndex;
+            int trackedFeatures = 0;
             for (auto &obsMapPoint : obsMapPoints) {
-                cv::KeyPoint singePrevPt =  prevFrame->getKeypoints()[obsMapPoint.second->getKpID(prevFrame->getFrameID)].pt;
+                cv::Point2f singlePrevPt =  prevFrame->getKeypoints()[obsMapPoint.second->getKpID(prevFrame->getFrameID())].pt;
                 
                 // now get 3d location of this mapPoint and reproject it to the current frame
                 Vec3 mapPoint3D = obsMapPoint.second->getPosition();
-                
+                cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
+                // check if the point is within the image
 
+                if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
+                    continue;
+                }
+
+                prevPts.push_back(singlePrevPt);
+                currPts.push_back(currPt);
+                mapPointIndex.push_back(obsMapPoint.first);
+                trackedFeatures++;
+            }
+            // log the number of tracked features for this frame pair
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << trackedFeatures << " reprojected 3d points from " << obsMapPoints.size() << " 3d points ";
+
+
+            int inlierCount = 0;
+            // now get the flow between the two frames
+            optFlow->getOptFlow(prevFrame, currFrame, prevPts, currPts);
+            std::vector<uchar> flowStatus = optFlow->getFlowStatus();
+            for (int i=0; i<flowStatus.size();i++) {
+                if(flowStatus.at(i)==1) {
+                    // Flow is good for this point, add this point as feature to the current frame
+                    // first empty the keypoints
+                    currFrame->clearKeypoints();
+                    currFrame->addKeypoint(cv::KeyPoint(currPts[i], 3));
+                    currFrame->addObservation(obsMapPoints[mapPointIndex[i]]);
+                    // add this point as observation to the mapPoint
+                    obsMapPoints[mapPointIndex[i]]->addObservation(currFrame->getFrameID(), currFrame->getKeypoints().size()-1);
+
+                    inlierCount++;
+                }
             }
 
-
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << inlierCount << " inliers out of " << trackedFeatures << " tracked features";
+            return inlierCount;
         }
+
 
 
         Frame::Ptr prepNextFrame() {
@@ -208,30 +245,37 @@ class VO {
             // cv::Mat leftImage, rightImage;
             cv::Mat cvleftImage = dataHandler->getNextData(CameraSide::LEFT);
             cv::Mat cvrightImage = dataHandler->getNextData(CameraSide::RIGHT);
+            Frame::Ptr leftFrame, rightFrame;
             if (cvleftImage.empty() || cvrightImage.empty()) {
                 LOG(ERROR) << "No more data to process";
                 return nullptr;
             }
             if (dataHandler->isCudaSet()) {
                 // this->featureDetector->gpuStatus();
-                leftImage.upload(cvleftImage);
-                rightImage.upload(cvrightImage);
-                featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1);
-                featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
-                featureDetector->matchFeatures(descriptors1, descriptors2, matches);
-                featureDetector->removeOutliers(matches, filteredMatches);
-                featureDetector->convertGPUKpts(keyPoints1, gpukeyPoints1);
-                featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
-                descriptors1.download(matDescriptors1);
-                descriptors2.download(matDescriptors2);
+                if (this->status == voStatus::INIT) {
+                    leftImage.upload(cvleftImage);
+                    rightImage.upload(cvrightImage);
+                    featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1);
+                    featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
+                    featureDetector->matchFeatures(descriptors1, descriptors2, matches);
+                    featureDetector->removeOutliers(matches, filteredMatches);
+                    featureDetector->convertGPUKpts(keyPoints1, gpukeyPoints1);
+                    featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
+                    descriptors1.download(matDescriptors1);
+                    descriptors2.download(matDescriptors2);
+                    leftFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints1, matDescriptors1, this->intrinsics, filteredMatches, cvleftImage);
+                    rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints2, matDescriptors2, this->intrinsics, filteredMatches, cvrightImage);
+                    leftFrame->rightFrame = rightFrame;
+                } else {
+                    std::vector<cv::KeyPoint> emptyKpts = {};
+                    std::vector<cv::DMatch> emptyMatches = {};
+                    leftFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), emptyKpts, cv::Mat(), this->intrinsics, emptyMatches, cvleftImage);
+                    rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), emptyKpts, cv::Mat(), this->intrinsics, emptyMatches, cvrightImage);
+                    leftFrame->rightFrame = rightFrame;
+                }
             } else {
                 LOG(ERROR) << "CPU framePrep not implemented yet";
             }
-
-            Frame::Ptr leftFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints1, matDescriptors1, this->intrinsics, filteredMatches, cvleftImage);
-            Frame::Ptr rightFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints2, matDescriptors2, this->intrinsics, filteredMatches, cvrightImage);
-            leftFrame->rightFrame = rightFrame;
-
             return leftFrame;
         }
 
@@ -288,5 +332,8 @@ int main() {
       // Lh.viz->viewerThread = std::thread(std::bind(&Viewer::plotterLoop, Lh.viz));
     std::thread VOThread = std::thread(std::bind(&VO<cv::cuda::GpuMat>::runVO, vo));
     vo.viewer->viewerRun();
+    // google::LogMessage::Flush()
+    google::FlushLogFiles(google::GLOG_INFO);
+
     return 0;
 }
