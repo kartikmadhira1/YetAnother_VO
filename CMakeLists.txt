@@ -71,6 +71,15 @@ target_link_libraries(
   )
 
 
+  add_executable(
+    soExample src/soExample.cc
+  )
+  target_link_libraries(
+      soExample PRIVATE Iconv::Iconv Sophus::Sophus)
+
+
+
+
 # add_executable(
 #   temp src/temp.cc src/Utils.cc
 # )
