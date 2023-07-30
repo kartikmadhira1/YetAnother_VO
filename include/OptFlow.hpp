@@ -38,6 +38,7 @@ class OptFlow {
             if (isGPU) {
                 optFlowGPU = cv::cuda::SparsePyrLKOpticalFlow::create();
                 optFlowGPU->setWinSize(cv::Size(11, 11));
+                // optFlowGPU->
             }
             else {
                 optFlowCPU = cv::SparsePyrLKOpticalFlow::create();

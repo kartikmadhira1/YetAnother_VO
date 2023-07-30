@@ -22,6 +22,7 @@ class Frame  {
         cv::Mat rawImg;
         Intrinsics::Ptr intrinsics;
         std::vector<cv::DMatch> LRmatches;
+        std::vector<bool> featureInlierFlag;
         // std::vector<cv::DMatch> LRmatches;
         std::mutex poseMutex; //lock whenever accesing/writing to the object.
 
@@ -41,6 +42,8 @@ class Frame  {
             rightFrame = nullptr;
             LRmatches = _LRmatches;
             rawImg = _rawImg;
+            // inlierflag
+            featureInlierFlag.resize(keypoints.size(), true);
         }
 
         Sophus::SE3d getPose() {
@@ -88,6 +91,23 @@ class Frame  {
             this->keypoints.push_back(kp);  
         }
 
+        bool resetFeatureInliers() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            featureInlierFlag.clear();
+            featureInlierFlag.resize(keypoints.size(), true);
+            return true;
+        }
+
+        int getFeatureInlierFlag(int kpID) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            return featureInlierFlag[kpID];
+        }
+
+        bool setFeatureInlierFlag(int kpID, bool flag) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            featureInlierFlag[kpID] = flag;
+            return true;
+        }
 
 
         bool updateMatchesMap (unsigned long _frameID, std::vector<cv::DMatch> &matches) {
@@ -137,7 +157,16 @@ class Frame  {
             return keypoints;
         }
 
-        
+        // Gets the MapPointID from the keypoint ID
+        int getMpIDfromKpID(int kpID) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            for (auto &obsMapPoint : obsMapPoints) {
+                if (obsMapPoint.second->getKpID(this->frameID) == kpID) {
+                    return obsMapPoint.first;
+                }
+            }
+            return -1;
+        }
         std::map<unsigned long, MapPoint::Ptr> getObsMapPoints() {
             std::unique_lock<std::mutex> lock(poseMutex);
             return obsMapPoints;

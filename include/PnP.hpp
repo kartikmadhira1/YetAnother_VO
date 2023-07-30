@@ -15,8 +15,8 @@
 #include <sophus/se3.hpp>
 #include <iostream>
 
-using namespace std;
 
+using namespace std;
 
 
 
@@ -65,6 +65,9 @@ class PnPEdgeProjection : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, PnPVerte
 
             // compute the error between actual and measured projection position
             _error = pCamPixel - _measurement;
+            // std::cout << "error: " << _error << std::endl;
+            // std::cout << pCamPixel << std::endl;
+            // std::cout << _measurement << std::endl;
         }
 
         // Jacobian calculation de/dT
@@ -90,7 +93,7 @@ class PnPEdgeProjection : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, PnPVerte
             -fy * X * Zinv;
 
         }
-        
+
         virtual bool read(istream &in) override {}
         virtual bool write(ostream &out) const override {}
     protected:
@@ -98,3 +101,4 @@ class PnPEdgeProjection : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, PnPVerte
         Eigen::Matrix3d _K;
 };
 
+#endif

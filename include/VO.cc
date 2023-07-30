@@ -9,7 +9,7 @@
 #include "Viz.hpp"
 #include "Map.hpp"
 #include "OptFlow.hpp"
-
+#include "PnP.hpp"
 
 enum dataset {kitti, tum, euroc};
 
@@ -142,6 +142,18 @@ class VO {
                         viewer->updateMap();
                         status = voStatus::TRACKING;
                         prevFrame = currFrame;
+                        // typedef Eigen::Matrix<double, 6, 1> Vector6d;
+                        // Vector6d vUpdate;
+                        // vUpdate.setZero();
+                        // // vUpdate(0, 5) = 1e-4;
+                        // vUpdate << 0, 0., 0., 0., 0., 0.1;
+                        // relativeMotion = Sophus::SE3d::exp(vUpdate)*relativeMotion
+                        // ;
+
+                        Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
+                        Eigen::Vector3d t(0, 0, -0.1);
+                        relativeMotion = Sophus::SE3d(R, t);
+                        std::cout << relativeMotion.matrix3x4() << std::endl;
                     } else {
                         LOG(ERROR) << "Map initialization failed for frame ID: " << currFrame->getFrameID();
                         status = voStatus::INIT;
@@ -165,6 +177,11 @@ class VO {
                 // 5. If more than 20% points are inliers, register frame as regular frame, update the mapPoint with new observation and update frame with observation
                 int optFlowInlierCount = track();
 
+                // optimize the pose of the current frame using PnP provided there are enough inliers
+                int optimizedInliers = optimizeCurrPose();
+
+
+
                 //6. If inliers not enough, mask the points that are now features and detect new features that are masked with the already detected features
                 relativeMotion = currFrame->getPose()*prevFrame->getPose().inverse();
                 map->insertKeyFrame(currFrame);
@@ -178,6 +195,106 @@ class VO {
 
 
         }
+
+        int optimizeCurrPose() {
+            // set up g2o
+
+            typedef g2o::BlockSolver_6_3 BlockSolverType;
+            typedef g2o::LinearSolverDense<BlockSolverType::PoseMatrixType>
+                LinearSolverType;
+            auto solver = new g2o::OptimizationAlgorithmLevenberg(
+                std::make_unique<BlockSolverType>(
+                    std::make_unique<LinearSolverType>()));
+            g2o::SparseOptimizer optimizer;
+            optimizer.setAlgorithm(solver);
+
+            // there is only one vertex => current frame pose
+            PnPVertex* v = new PnPVertex();
+            v->setId(0);
+            v->setEstimate(currFrame->getPose());
+            optimizer.addVertex(v);
+
+            // add edges
+            int index = 1;
+            std::vector<PnPEdgeProjection*> edges;
+
+            // For each feature in current frame => get corresponding 3d point
+            auto currFrameKpts = currFrame->getKeypoints();
+            auto currFrameObs = currFrame->getObsMapPoints();
+            // get kp size
+            for (int i=0; i< currFrameKpts.size();i++) {
+                // get current frame keypoint
+                auto currFrameKpt = currFrameKpts[i];
+                // get corresponding 3d point
+                // will have to iterate through all observations and find which mapPoint has this kpID
+                int mpID = currFrame->getMpIDfromKpID(i);
+                if (mpID == -1) {
+                    LOG(ERROR) << "Frame ID: " << currFrame->getFrameID() << " does not have a 3d point corresponding to keypoint ID: " << i;
+                    continue;
+                }
+                auto mapPoint = currFrameObs[mpID];
+                // 3d point is,
+                Vec3 mapPoint3D = mapPoint->getPosition();
+                // 2d point in Vec2
+                Vec2 framePoint2D(currFrameKpt.pt.x, currFrameKpt.pt.y);
+                // create edge
+                Eigen::Matrix3d K;
+                intrinsics->Left.getKEigen(K);
+                PnPEdgeProjection* e = new PnPEdgeProjection(mapPoint3D, K);
+                e->setId(index);
+                e->setVertex(0, v);
+                e->setMeasurement(framePoint2D);
+                e->setInformation(Eigen::Matrix2d::Identity());
+                e->setRobustKernel(new g2o::RobustKernelHuber());
+                edges.push_back(e);
+                optimizer.addEdge(e);
+                index++;
+
+            }
+
+            // optimize with n iterations
+            const double chi2Thresh = 5.991;
+            int nIterations = 4;
+            int outlierCount = 0;
+
+            
+            for (int iteration=0; iteration < nIterations; ++iteration) {
+                v->setEstimate(currFrame->getPose());
+                optimizer.initializeOptimization(0);
+                optimizer.setVerbose(true);
+
+                optimizer.optimize(10);
+                outlierCount = 0;
+                for (size_t i=0; i<edges.size(); ++i) {
+                    auto e = edges[i];
+                    if (currFrame->getFeatureInlierFlag(i) == false) {
+                        e->computeError();
+                    }
+                    if (e->chi2() > chi2Thresh) {
+                        currFrame->setFeatureInlierFlag(i, true);
+                        e->setLevel(1);
+                        outlierCount++;
+                    } else {
+                        currFrame->setFeatureInlierFlag(i, false);
+                        e->setLevel(0);
+                    }
+                    if (iteration == nIterations-1) {
+                        e->setRobustKernel(nullptr);
+                    }
+                }
+                LOG(INFO) << "Iteration: " << iteration << " has " << outlierCount << " outliers";
+            }
+
+
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << outlierCount << " outliers AND " << currFrame->getKeypoints().size()- outlierCount << " inliers" ;
+            LOG(INFO) << "old pose: " << currFrame->getPose().matrix3x4();
+            LOG(INFO) << "new pose: " << v->estimate().matrix3x4();
+            // update the pose of the current frame
+            currFrame->setPose(v->estimate());
+            // returnb the number of inliers
+            return currFrame->getKeypoints().size() - outlierCount;
+        }
+
 
         int track() {
             // reproject all the 3d points seen in previous frame to the current frame
@@ -211,11 +328,14 @@ class VO {
             // now get the flow between the two frames
             optFlow->getOptFlow(prevFrame, currFrame, prevPts, currPts);
             std::vector<uchar> flowStatus = optFlow->getFlowStatus();
+                                
+            // first empty the keypoints          
+            currFrame->clearKeypoints();
+
             for (int i=0; i<flowStatus.size();i++) {
                 if(flowStatus.at(i)==1) {
                     // Flow is good for this point, add this point as feature to the current frame
-                    // first empty the keypoints
-                    currFrame->clearKeypoints();
+                
                     currFrame->addKeypoint(cv::KeyPoint(currPts[i], 3));
                     currFrame->addObservation(obsMapPoints[mapPointIndex[i]]);
                     // add this point as observation to the mapPoint
@@ -224,6 +344,9 @@ class VO {
                     inlierCount++;
                 }
             }
+
+            // reset the kp inlier flag
+            currFrame->resetFeatureInliers();
 
             LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << inlierCount << " inliers out of " << trackedFeatures << " tracked features";
             return inlierCount;
