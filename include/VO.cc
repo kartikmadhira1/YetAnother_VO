@@ -36,6 +36,10 @@ class VO {
         Sophus::SE3d relativeMotion;
         OptFlow::Ptr optFlow;
 
+        bool relVelSet = false;
+        // Thresholds
+        int minInlierCount = 10;
+
     public:
         // viewer thread has to be in main thread
         Viewer::Ptr viewer;
@@ -108,7 +112,6 @@ class VO {
         }
         bool runVO() {
             while (debugSteps--) {
-                std::cout << debugSteps << std::endl;
 
                 if (!takeVOStep()) {
                     LOG(ERROR) << "VO failed at step " << debugSteps;
@@ -140,20 +143,9 @@ class VO {
                         map->insertKeyFrame(currFrame->rightFrame);
                         viewer->addCurrentFrame(currFrame);
                         viewer->updateMap();
-                        status = voStatus::TRACKING;
+                  
                         prevFrame = currFrame;
-                        // typedef Eigen::Matrix<double, 6, 1> Vector6d;
-                        // Vector6d vUpdate;
-                        // vUpdate.setZero();
-                        // // vUpdate(0, 5) = 1e-4;
-                        // vUpdate << 0, 0., 0., 0., 0., 0.1;
-                        // relativeMotion = Sophus::SE3d::exp(vUpdate)*relativeMotion
-                        // ;
-
-                        Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
-                        Eigen::Vector3d t(0, 0, -0.1);
-                        relativeMotion = Sophus::SE3d(R, t);
-                        std::cout << relativeMotion.matrix3x4() << std::endl;
+                        status = voStatus::TRACKING;
                     } else {
                         LOG(ERROR) << "Map initialization failed for frame ID: " << currFrame->getFrameID();
                         status = voStatus::INIT;
@@ -167,33 +159,229 @@ class VO {
                         // Q - Should the outlier be added as new 3d points?
 
                 LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " is a entering TRACKING state";
-                if (prevFrame != nullptr) {
-                    currFrame->setPose(relativeMotion*prevFrame->getPose());
+                currFrame->setPose(relativeMotion*prevFrame->getPose());
+
+
+                // If relative velocity is not set, we need to find matches in the second frame and then set 
+                if (!relVelSet) {
+                    LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " - Initializing SECOND frame";
+                    initSecFrame();
+
+                    relVelSet = true;
+                } else {
+                    int optFlowInlierCount = track();
                 }
 
-                // log current frame pose
-                LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has pose: " << currFrame->getPose().matrix3x4();
-
                 // 5. If more than 20% points are inliers, register frame as regular frame, update the mapPoint with new observation and update frame with observation
-                int optFlowInlierCount = track();
 
                 // optimize the pose of the current frame using PnP provided there are enough inliers
                 int optimizedInliers = optimizeCurrPose();
 
+                if (optimizedInliers < minInlierCount) {
+                    LOG(ERROR) << "Frame ID: " << currFrame->getFrameID() << " - TRACKING FAILED";
+                    LOG(INFO) << "Triangulating new points";
 
+                    // before new features, capture index of last frame keypoints +1
+                    int indexLastFrameKp = currFrame->getKeypoints().size();
 
-                //6. If inliers not enough, mask the points that are now features and detect new features that are masked with the already detected features
+                    // new features detect+match with right frame with masking of already detected features
+                    detectNewFeatures(true, currFrame);
+
+                    // triangulate new points
+                    triangulateNewPoints(indexLastFrameKp);
+                    map->insertKeyFrame(currFrame);
+                    map->insertKeyFrame(currFrame->rightFrame);
+                    viewer->addCurrentFrame(currFrame);
+                }
+
+                // register as a keyframe
+
                 relativeMotion = currFrame->getPose()*prevFrame->getPose().inverse();
-                map->insertKeyFrame(currFrame);
-                map->insertKeyFrame(currFrame->rightFrame);
-                viewer->addCurrentFrame(currFrame);
-                viewer->updateMap();
-                status = voStatus::TRACKING;
+           
                 prevFrame = currFrame;
+           
+                //6. If inliers not enough, mask the points that are now features and detect new features that are masked with the already detected features
 
             }
+        
+            viewer->updateMap();
+
+        }
+
+        bool initSecFrame() {
+            // find features in this second frame and then match with the first ref frame
+            cv::cuda::GpuMat leftImage, rightImage;
+            cv::cuda::GpuMat gpukeyPoints1, gpukeyPoints2, gpukeyPointsCheck, descriptors1, descriptors2;
+            cv::Mat matDescriptors1, matDescriptors2;
+            std::vector<cv::DMatch> matches, filteredMatches;
+            std::vector<cv::KeyPoint> keyPoints1, keyPoints2;
+            cv::Mat mask = cv::Mat::zeros(currFrame->getRawImg().size(), CV_8UC1);
+            cv::cuda::GpuMat maskGPU;
+            maskGPU.upload(mask);
+            cv::Mat cvLeftImage = prevFrame->getRawImg();
+            cv::Mat cvRightImage = currFrame->getRawImg();
+            
+            leftImage.upload(cvLeftImage);
+            rightImage.upload(cvRightImage);
+
+            // gpukeypoints will need to have a mat of numFeaturesx6 size
+            // 6 columns gpu will be x,y,1, size, angle, response
+            auto lefKpts = prevFrame->getKeypoints();
+            cv::Mat keypointsMatLeft(lefKpts.size(), 6, CV_32FC1);
+
+            for (size_t i = 0; i < lefKpts.size(); i++) {
+                keypointsMatLeft.at<float>(i, 0) = lefKpts[i].pt.x;
+                keypointsMatLeft.at<float>(i, 1) = lefKpts[i].pt.y;
+                keypointsMatLeft.at<float>(i, 2) = lefKpts[i].size;
+                keypointsMatLeft.at<float>(i, 3) = lefKpts[i].angle;
+                keypointsMatLeft.at<float>(i, 4) = lefKpts[i].response;
+                keypointsMatLeft.at<float>(i, 5) = lefKpts[i].octave;
+            }
+
+            gpukeyPoints1.upload(keypointsMatLeft);
+            
+            cv::Mat lImgDesc = prevFrame->getDescriptors();
+            descriptors1.upload(lImgDesc);
+            // featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1, maskGPU ,true);
+            featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
+ 
+            featureDetector->matchFeatures(descriptors1, descriptors2, matches);
+
+            featureDetector->removeOutliers(matches, filteredMatches, 10);
+
+            featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
+       
+            // log filtered matches info
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << filteredMatches.size() << " matches with reference frame";
+
+            // now apply current frame with all the filtered matches
+            currFrame->clearKeypoints();
+            auto obsMapPoints = prevFrame->getObsMapPoints();
+            std::vector<cv::DMatch> filteredMatchesCheck;
+            int index=0;
+            for (auto &eachMatch : filteredMatches) {
+                // if prevPoint belongs to a matched point
+                if (prevFrame->getFeatureInlierFlag(eachMatch.queryIdx)) {
+                    // if such mapPoint exists with this keypoint
+                    if (prevFrame->getMpIDfromKpID(eachMatch.queryIdx) != -1) {
+                        // get the keypoint from the previous frame
+                        // auto currKpt = curr->getKeypoints()[eachMatch.queryIdx];
+                        // add the keypoint to the current frame
+                        currFrame->addKeypoint(keyPoints2[eachMatch.trainIdx]);
+                        cv::DMatch newMatch;
+                        newMatch.queryIdx = eachMatch.queryIdx;
+                        newMatch.trainIdx = index;
+                        newMatch.distance = eachMatch.distance;
+                        filteredMatchesCheck.push_back(newMatch);
+                        // add observation to the map point
+                        auto mapPoint = obsMapPoints[prevFrame->getMpIDfromKpID(eachMatch.queryIdx)];
+                        mapPoint->addObservation(currFrame->getFrameID(), index);
+                        currFrame->addObservation(mapPoint);
+
+                        // obsMapPoints[prevFrame->getMpIDfromKpID(eachMatch.queryIdx)]->addObservation(currFrame->getFrameID(), index);
+                        index++;
+
+                    }
+                }
+
+            }
+            cv::Mat out;
+            auto lVec = prevFrame->getKeypoints();
+            auto rVec = currFrame->getKeypoints();
+            // temp function to see matches between previous and current frame
+            featureDetector->drawMatches(cvLeftImage, cvRightImage, lVec, rVec, filteredMatchesCheck, out);
+            cv::imwrite("image" + std::to_string(currFrame->getFrameID())+ "_initSecFrame_check.png", out);
 
 
+
+            // // Initial pose to move it
+
+            // Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
+            // Eigen::Vector3d t(0,0, -0.1);
+            // Sophus::SE3d initT(R, t);
+            // currFrame->setPose(initT);
+
+            // set all inliers to true
+            currFrame->setAllInliers(true);
+
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << index << " observations from the previous frame";
+            return true;
+
+        }
+
+
+        bool detectNewFeatures(bool trackedFrame, Frame::Ptr frame) {
+            cv::Mat mask = cv::Mat::zeros(frame->getRawImg().size(), CV_8UC1);
+            cv::Mat imgCopy = frame->getRawImg();
+            cv::cvtColor(imgCopy, imgCopy, cv::COLOR_GRAY2BGR);
+            // if this is a tracked frame, mask the current features
+            if (trackedFrame) {
+                auto currFrameKpts = frame->getKeypoints();
+                // create a mask
+                for (auto &currFrameKpt : currFrameKpts) {
+                    cv::rectangle(mask, currFrameKpt.pt - cv::Point2f(10, 10), currFrameKpt.pt + cv::Point2f(10, 10), cv::Scalar(255), cv::FILLED);
+                    cv::circle(imgCopy, currFrameKpt.pt, 3, cv::Scalar(0, 0, 255), 2);
+                }
+            }
+
+            // download mask to gpu
+            cv::cuda::GpuMat maskGPU;
+            maskGPU.upload(mask);
+
+            cv::cuda::GpuMat leftImage, rightImage;
+            cv::cuda::GpuMat gpukeyPoints1, gpukeyPoints2, descriptors1, descriptors2;
+            cv::Mat matDescriptors1, matDescriptors2;
+            std::vector<cv::DMatch> matches, filteredMatches;
+            std::vector<cv::KeyPoint> keyPoints1, keyPoints2;
+
+            cv::Mat cvLeftImage = frame->getRawImg();
+            cv::Mat cvRightImage = frame->rightFrame->getRawImg();
+
+            leftImage.upload(cvLeftImage);
+            rightImage.upload(cvRightImage);
+            featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1, maskGPU);
+            featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
+            featureDetector->matchFeatures(descriptors1, descriptors2, matches);
+            featureDetector->removeOutliers(matches, filteredMatches);
+            featureDetector->convertGPUKpts(keyPoints1, gpukeyPoints1);
+            featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
+
+            // set new feautres to the frame
+            int indexLastFrameKp = frame->getKeypoints().size();
+
+            for (auto &keyPoint : keyPoints1) {
+                frame->addKeypoint(keyPoint);
+                frame->setFeatureInlierFlag(indexLastFrameKp, true);
+                cv::circle(imgCopy, keyPoint.pt, 5, cv::Scalar(255, 0, 0), 2);
+
+                indexLastFrameKp++;
+            }
+
+            for (auto &keyPoint : keyPoints2) {
+                frame->rightFrame->addKeypoint(keyPoint);
+                // frame->rightFrame->setFeatureInlierFlag(indexLastFrameKp, true);
+                // indexLastFrameKp++;
+            }
+
+            // set LR matches to filtered matches
+            frame->setLRmatches(filteredMatches);
+            cv::imwrite("image" + std::to_string(frame->getFrameID())+ "_mask_check.png", imgCopy);
+            return true;
+        } 
+
+        bool triangulateNewPoints(int indexLastFrameKp) {
+            // Triangulate points based on the LR stereo images
+            std::vector<cv::DMatch> matches = currFrame->getLRMatches();
+            bool ret = Handler3D->triangulateAll(currFrame, currFrame->rightFrame, matches, true, indexLastFrameKp);
+            currFrame->rightFrame->setPose(currFrame->getRightPoseInWorldFrame());
+
+            if (!ret) {
+                return false;
+            }
+            // update map with all 3d points 
+            insertMPfromFrame(currFrame);
+            LOG(INFO) << "New points triangulated";
+            return true;
         }
 
         int optimizeCurrPose() {
@@ -251,8 +439,8 @@ class VO {
                 index++;
 
             }
-
-            // optimize with n iterations
+          
+            // // optimize with n iterations
             const double chi2Thresh = 5.991;
             int nIterations = 4;
             int outlierCount = 0;
@@ -260,8 +448,8 @@ class VO {
             
             for (int iteration=0; iteration < nIterations; ++iteration) {
                 v->setEstimate(currFrame->getPose());
-                optimizer.initializeOptimization(0);
-                optimizer.setVerbose(true);
+                optimizer.initializeOptimization();
+                // optimizer.setVerbose(true);
 
                 optimizer.optimize(10);
                 outlierCount = 0;
@@ -271,11 +459,11 @@ class VO {
                         e->computeError();
                     }
                     if (e->chi2() > chi2Thresh) {
-                        currFrame->setFeatureInlierFlag(i, true);
+                        currFrame->setFeatureInlierFlag(i, false);
                         e->setLevel(1);
                         outlierCount++;
                     } else {
-                        currFrame->setFeatureInlierFlag(i, false);
+                        currFrame->setFeatureInlierFlag(i, true);
                         e->setLevel(0);
                     }
                     if (iteration == nIterations-1) {
@@ -286,12 +474,17 @@ class VO {
             }
 
 
-            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << outlierCount << " outliers AND " << currFrame->getKeypoints().size()- outlierCount << " inliers" ;
-            LOG(INFO) << "old pose: " << currFrame->getPose().matrix3x4();
-            LOG(INFO) << "new pose: " << v->estimate().matrix3x4();
+            LOG(INFO) << "OPTIMIZER INLIERS: Frame ID: " << currFrame->getFrameID() << " has " << outlierCount << " outliers AND " << currFrame->getKeypoints().size()- outlierCount << " inliers" ;
+            
+            // old pose
+            LOG(INFO) << "Frame ID(old): " << currFrame->getFrameID() << " has pose: " << currFrame->getPose().matrix();
+
+        
             // update the pose of the current frame
             currFrame->setPose(v->estimate());
-            // returnb the number of inliers
+            LOG(INFO) << "Frame ID(new): " << currFrame->getFrameID() << " has pose: " << currFrame->getPose().matrix();
+
+            // return the number of inliers
             return currFrame->getKeypoints().size() - outlierCount;
         }
 
@@ -348,7 +541,7 @@ class VO {
             // reset the kp inlier flag
             currFrame->resetFeatureInliers();
 
-            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << inlierCount << " inliers out of " << trackedFeatures << " tracked features";
+            LOG(INFO) << "TRACKING INLIERS: Frame ID: " << currFrame->getFrameID() << " has " << inlierCount << " inliers out of " << trackedFeatures << " tracked features";
             return inlierCount;
         }
 
@@ -384,6 +577,8 @@ class VO {
                     featureDetector->removeOutliers(matches, filteredMatches);
                     featureDetector->convertGPUKpts(keyPoints1, gpukeyPoints1);
                     featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
+
+
                     descriptors1.download(matDescriptors1);
                     descriptors2.download(matDescriptors2);
                     leftFrame = std::make_shared<Frame>(Frame::createFrameID(), Sophus::SE3d(), keyPoints1, matDescriptors1, this->intrinsics, filteredMatches, cvleftImage);
@@ -411,7 +606,21 @@ class VO {
         bool buildInitMap() {
             // Triangulate points based on the LR stereo images
             std::vector<cv::DMatch> matches = currFrame->getLRMatches();
-            bool ret = Handler3D->triangulateAll(currFrame, currFrame->rightFrame, matches);
+
+            currFrame->setAllInliers(false);
+            currFrame->rightFrame->setAllInliers(false);
+            // add keypoints only that are matches
+            for (auto &eachMatch : matches) {
+             
+                // set the feature inlier flag to true
+                currFrame->setFeatureInlierFlag(eachMatch.queryIdx, true);
+                // do same for right frame
+                currFrame->rightFrame->setFeatureInlierFlag(eachMatch.trainIdx, true);
+            }
+
+
+
+            bool ret = Handler3D->triangulateAll(currFrame, currFrame->rightFrame, matches,false, 0);
              currFrame->rightFrame->setPose(currFrame->getRightPoseInWorldFrame());
 
             if (!ret) {

@@ -89,7 +89,7 @@ class _3DHandler {
             *@param: pnts3D: 3D points of type cv::Mat
             *@return: bool: true if 3D points are computed successfully, false otherwise
         */
-        bool triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches);
+        bool triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches, bool trackedFrame, int lastIndexofTrackedKP);
 
         /*
             *@brief: Linear Triangulation of single 3d point from two views

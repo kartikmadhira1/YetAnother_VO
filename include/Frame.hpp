@@ -83,12 +83,17 @@ class Frame  {
         }
 
         void clearKeypoints() {
-            this->keypoints.clear();
+            this->keypoints = {};
         }
 
-        void addKeypoint(const cv::KeyPoint &kp) {
+        void addKeypoint(const cv::KeyPoint kp) {
             std::unique_lock<std::mutex> lock(poseMutex);
             this->keypoints.push_back(kp);  
+        }
+        
+        void setLRmatches(std::vector<cv::DMatch> &matches) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            this->LRmatches = matches;
         }
 
         bool resetFeatureInliers() {
@@ -97,7 +102,10 @@ class Frame  {
             featureInlierFlag.resize(keypoints.size(), true);
             return true;
         }
-
+        auto getAllInliers() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            return featureInlierFlag;
+        }
         int getFeatureInlierFlag(int kpID) {
             std::unique_lock<std::mutex> lock(poseMutex);
             return featureInlierFlag[kpID];
@@ -105,6 +113,11 @@ class Frame  {
 
         bool setFeatureInlierFlag(int kpID, bool flag) {
             std::unique_lock<std::mutex> lock(poseMutex);
+            if (kpID >= featureInlierFlag.size()) {
+                // featureInlierFlag.resize(kpID+10, true);
+                featureInlierFlag.emplace_back(true);
+                return true;
+            }
             featureInlierFlag[kpID] = flag;
             return true;
         }
@@ -147,6 +160,11 @@ class Frame  {
             return rawImg;
         }
 
+        cv::Mat getDescriptor() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            return descriptors;
+        }
+
         std::vector<cv::DMatch> getLRMatches() {
             std::unique_lock<std::mutex> lock(poseMutex);
             return LRmatches;
@@ -165,8 +183,31 @@ class Frame  {
                     return obsMapPoint.first;
                 }
             }
+            LOG(ERROR) << "Frame ID: " << frameID << " does not have a map point ID for keypoint ID: " << kpID;
             return -1;
         }
+
+        // get descriptors
+        cv::Mat getDescriptors() {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            return this->descriptors;
+        }
+
+        // set all inliers to a value
+        bool setAllInliers(bool flag) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            if (featureInlierFlag.size() == 0) {
+                LOG(ERROR) << "Frame ID: " << frameID << " does not have any features FLAGS";
+                featureInlierFlag.resize(keypoints.size(), flag);
+                return true;
+            }
+            for (int i = 0; i < featureInlierFlag.size(); i++) {
+                featureInlierFlag[i] = flag;
+            }
+            return true;
+        }
+
+
         std::map<unsigned long, MapPoint::Ptr> getObsMapPoints() {
             std::unique_lock<std::mutex> lock(poseMutex);
             return obsMapPoints;

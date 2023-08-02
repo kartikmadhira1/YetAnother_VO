@@ -88,14 +88,15 @@ inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
 
 // trinagulation after creating Map and MapPoints
 
-bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches) {
-    
+bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches, bool trackedFrame, int lastIndexofTrackedKP=0) {
+
+    Sophus::SE3d Tcw = srcFrame ->getPose().inverse();
     // set poses for both views
     std::cout << srcFrame->getFrameID() << " " << dstFrame->getFrameID() << std::endl;
     std::vector<Sophus::SE3d> poses{srcFrame->getPose(), srcFrame->getRightPoseInWorldFrame()};
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
-
+      
     if (matches.size() < 4) {
         LOG(ERROR) << "Not enough matches to triangulate";
         return false;
@@ -103,20 +104,26 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
 
 
     int landmarkCount = 0;
+
     for (auto &match : matches) {
-        // get the keypoints that have been matched
+        
         std::vector<Vec3> points {
-            this->intrinsics->Left.pixel2camera(cv::Point(srcFrame->getKeypoints()[match.queryIdx].pt)),
+            this->intrinsics->Left.pixel2camera(cv::Point(srcFrame->getKeypoints()[lastIndexofTrackedKP + match.queryIdx].pt)),
             this->intrinsics->Left.pixel2camera(cv::Point(dstFrame->getKeypoints()[match.trainIdx].pt))
         };
+
         Vec3 pWorld = Vec3::Zero();
+
         if (triangulatePoint(poses, points, pWorld) && pWorld[2] > 0) {
             // update landmark count
             landmarkCount++;
             // add the 3d point to the map
+            if (trackedFrame) {
+                pWorld = Tcw * pWorld;
+            }
             auto newMapPoint = std::make_shared<MapPoint>(MapPoint::createMapPointID(), pWorld);
             // register the features that led to creation of this 3d point
-            newMapPoint->addObservation(srcFrame->getFrameID(), match.queryIdx);
+            newMapPoint->addObservation(srcFrame->getFrameID(), lastIndexofTrackedKP + match.queryIdx);
             newMapPoint->addObservation(dstFrame->getFrameID(), match.trainIdx);
 
             // add the 3d point to the frame observations

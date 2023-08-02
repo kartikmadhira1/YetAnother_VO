@@ -62,9 +62,10 @@ void Viewer::plotterLoop() {
 
             followCurrentFrame(visCamera);
 
-            // cv::Mat img = plotFromImage();
+            cv::Mat img = plotFromImage();
             // cv::imshow("image", img);
             // cv::waitKey(1);
+            // cv::imwrite("image" + std::to_string(currentFrame->getFrameID())+ ".png", img);
         }
         for (auto &eachFrame : frames) {
             drawFrame(eachFrame.second, red);
@@ -75,7 +76,7 @@ void Viewer::plotterLoop() {
         }
 
         pangolin::FinishFrame();
-        usleep(500);
+        usleep(5000);
     }
 }
 

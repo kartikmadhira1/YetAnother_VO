@@ -65,6 +65,9 @@ class PnPEdgeProjection : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, PnPVerte
 
             // compute the error between actual and measured projection position
             _error = pCamPixel - _measurement;
+            // LOG(INFO) << "error: " << _error;
+            // LOG(INFO) << "pcampixel" << pCamPixel;
+            // LOG(INFO) << "measurement" << _measurement;
             // std::cout << "error: " << _error << std::endl;
             // std::cout << pCamPixel << std::endl;
             // std::cout << _measurement << std::endl;

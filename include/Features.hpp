@@ -35,13 +35,13 @@ class Features {
             try {
                 if (detectorType == DetectorType::ORB) {
                     if (isGPU) {
-                        detectorGPU = cv::cuda::ORB::create(500);
+                        detectorGPU = cv::cuda::ORB::create(1000);
                         detectorGPU->setBlurForDescriptor(true);
                         LOG(INFO) << "ORB Detector initialized with CUDA";
                         std::cout << "ORB Detector initialized with CUDA" << std::endl;
                     }
                     else {
-                        detectorCPU = cv::ORB::create(500);
+                        detectorCPU = cv::ORB::create(1000);
                         LOG(INFO) << "ORB Detector initialized";
                         std::cout << "ORB Detector initialized" << std::endl;
                     }
@@ -94,9 +94,9 @@ class Features {
 
         }
         
-        void detectFeatures(T &img, cv::cuda::GpuMat &keypoints, cv::cuda::GpuMat &descriptors) {
+        void detectFeatures(T &img, cv::cuda::GpuMat &keypoints, cv::cuda::GpuMat &descriptors, cv::cuda::GpuMat mask=cv::cuda::GpuMat(), bool useKpts=false) {
            
-            detectorGPU->detectAndComputeAsync(img, cv::cuda::GpuMat(), keypoints, descriptors);
+            detectorGPU->detectAndComputeAsync(img, mask, keypoints, descriptors, useKpts);
         }
 
         void detectFeatures(T &img, std::vector<cv::KeyPoint> &keypoints, cv::Mat &descriptors) {
@@ -128,12 +128,11 @@ class Features {
             cv::drawMatches(Img1CPU, kp1CPU, Img2CPU, kp2CPU, matches, outImg);
         }
 
-        void drawMatches(T img1, T img2, std::vector<cv::KeyPoint> &keypoints1, std::vector<cv::KeyPoint> &keypoints2, std::vector<cv::DMatch> &matches, cv::Mat &outImg) {
+        void drawMatches(cv::Mat img1, cv::Mat img2, std::vector<cv::KeyPoint> &keypoints1, std::vector<cv::KeyPoint> &keypoints2, std::vector<cv::DMatch> &matches, cv::Mat &outImg) {
             cv::drawMatches(img1, keypoints1, img2, keypoints2, matches, outImg);
         }
 
-        void removeOutliers(std::vector<cv::DMatch> &matches, std::vector<cv::DMatch> &outMatches) {
-            double max_dist = 0; double min_dist = 100;
+        void removeOutliers(std::vector<cv::DMatch> &matches, std::vector<cv::DMatch> &outMatches, float threshold=3) {
             //-- Quick calculation of max and min distances between keypoints
             auto result = std::minmax_element(matches.begin(), matches.end(), [](const cv::DMatch &a, const cv::DMatch &b) {
                     return a.distance < b.distance;});
@@ -141,8 +140,7 @@ class Features {
             // Remove matches with distance greater than 2*min_dist
 
             for (auto &eachMatch : matches) {
-                if (eachMatch.distance < 3*result.first->distance){
-
+                if (eachMatch.distance < threshold*result.first->distance){
                     outMatches.push_back(eachMatch);
                 }
             }
