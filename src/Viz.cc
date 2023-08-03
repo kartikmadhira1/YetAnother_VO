@@ -154,7 +154,7 @@ void Viewer::drawFrame(Frame::Ptr frame, const float *color) {
 }
 
 void Viewer::drawMPs() {
-    const float red[3] = {1.0, 0, 0};
+    const float red[3] = {0, 0, 1.0};
     // for (auto& kf : frames) {
     //     drawFrame(kf.second, red);
     // }

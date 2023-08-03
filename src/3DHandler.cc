@@ -131,7 +131,7 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
             dstFrame->addObservation(newMapPoint);
 
             // add the 3d point to the map itself??????*******************  
-        }          
+        }
     }
     LOG(INFO) << "Triangulated: " << landmarkCount << " points";
     LOG(INFO) << "Total Matches: " << matches.size();

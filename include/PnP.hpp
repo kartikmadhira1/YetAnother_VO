@@ -28,19 +28,20 @@ class PnPVertex : public g2o::BaseVertex<6, Sophus::SE3d>
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        PnPVertex() {}
-        virtual bool read(istream& in) {}
-        virtual bool write(ostream& out) const {}
+        virtual bool read(istream& in) override {return true;}
+        virtual bool write(ostream& out) const override{return true;}
 
-        virtual void setToOriginImpl() {
+        virtual void setToOriginImpl() override {
             _estimate = Sophus::SE3d();
         }
 
         // update the optimization variable => Pose, with a delta in the vector space.
         // for small updates, P(t+1) = exp(update^)*P(t)
-        virtual void oplusImpl(const double* update) {
+        virtual void oplusImpl(const double* update) override {
             //se(3) is a 6D vector space
-            Eigen::Map<const Eigen::Matrix<double, 6, 1>> update_(update);
+            Eigen::Matrix<double, 6, 1> update_;
+
+            update_ << update[0], update[1], update[2], update[3], update[4], update[5];
             _estimate = Sophus::SE3d::exp(update_) * _estimate;
         }
 
@@ -61,10 +62,10 @@ class PnPEdgeProjection : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, PnPVerte
 
             // get the pixel position
             Eigen::Vector3d pCam = _K*(T*_point);
-            Eigen::Vector2d pCamPixel(pCam[0]/pCam[2], pCam[1]/pCam[2]);
-
+            // Eigen::Vector2d pCamPixel(pCam[0]/pCam[2], pCam[1]/pCam[2]);
+            pCam = pCam / pCam[2];
             // compute the error between actual and measured projection position
-            _error = pCamPixel - _measurement;
+            _error = _measurement - pCam.head<2>();
             // LOG(INFO) << "error: " << _error;
             // LOG(INFO) << "pcampixel" << pCamPixel;
             // LOG(INFO) << "measurement" << _measurement;
@@ -97,9 +98,9 @@ class PnPEdgeProjection : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, PnPVerte
 
         }
 
-        virtual bool read(istream &in) override {}
-        virtual bool write(ostream &out) const override {}
-    protected:
+        virtual bool read(istream &in) override {return true; }
+        virtual bool write(ostream &out) const override {return true; }
+    private:
         Eigen::Vector3d _point;
         Eigen::Matrix3d _K;
 };

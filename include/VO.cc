@@ -38,7 +38,7 @@ class VO {
 
         bool relVelSet = false;
         // Thresholds
-        int minInlierCount = 10;
+        int minInlierCount = 70;
 
     public:
         // viewer thread has to be in main thread
@@ -195,7 +195,7 @@ class VO {
                 }
 
                 // register as a keyframe
-
+         
                 relativeMotion = currFrame->getPose()*prevFrame->getPose().inverse();
            
                 prevFrame = currFrame;
@@ -215,7 +215,7 @@ class VO {
             cv::Mat matDescriptors1, matDescriptors2;
             std::vector<cv::DMatch> matches, filteredMatches;
             std::vector<cv::KeyPoint> keyPoints1, keyPoints2;
-            cv::Mat mask = cv::Mat::zeros(currFrame->getRawImg().size(), CV_8UC1);
+            cv::Mat mask(currFrame->getRawImg().size(), CV_8UC1, 255);
             cv::cuda::GpuMat maskGPU;
             maskGPU.upload(mask);
             cv::Mat cvLeftImage = prevFrame->getRawImg();
@@ -247,7 +247,7 @@ class VO {
  
             featureDetector->matchFeatures(descriptors1, descriptors2, matches);
 
-            featureDetector->removeOutliers(matches, filteredMatches, 10);
+            featureDetector->removeOutliers(matches, filteredMatches, 5);
 
             featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
        
@@ -292,15 +292,6 @@ class VO {
             featureDetector->drawMatches(cvLeftImage, cvRightImage, lVec, rVec, filteredMatchesCheck, out);
             cv::imwrite("image" + std::to_string(currFrame->getFrameID())+ "_initSecFrame_check.png", out);
 
-
-
-            // // Initial pose to move it
-
-            // Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
-            // Eigen::Vector3d t(0,0, -0.1);
-            // Sophus::SE3d initT(R, t);
-            // currFrame->setPose(initT);
-
             // set all inliers to true
             currFrame->setAllInliers(true);
 
@@ -311,7 +302,7 @@ class VO {
 
 
         bool detectNewFeatures(bool trackedFrame, Frame::Ptr frame) {
-            cv::Mat mask = cv::Mat::zeros(frame->getRawImg().size(), CV_8UC1);
+            cv::Mat mask(frame->getRawImg().size(), CV_8UC1, 255);
             cv::Mat imgCopy = frame->getRawImg();
             cv::cvtColor(imgCopy, imgCopy, cv::COLOR_GRAY2BGR);
             // if this is a tracked frame, mask the current features
@@ -319,7 +310,7 @@ class VO {
                 auto currFrameKpts = frame->getKeypoints();
                 // create a mask
                 for (auto &currFrameKpt : currFrameKpts) {
-                    cv::rectangle(mask, currFrameKpt.pt - cv::Point2f(10, 10), currFrameKpt.pt + cv::Point2f(10, 10), cv::Scalar(255), cv::FILLED);
+                    cv::rectangle(mask, currFrameKpt.pt - cv::Point2f(10, 10), currFrameKpt.pt + cv::Point2f(10, 10), 0, cv::FILLED);
                     cv::circle(imgCopy, currFrameKpt.pt, 3, cv::Scalar(0, 0, 255), 2);
                 }
             }
@@ -342,7 +333,7 @@ class VO {
             featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1, maskGPU);
             featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
             featureDetector->matchFeatures(descriptors1, descriptors2, matches);
-            featureDetector->removeOutliers(matches, filteredMatches);
+            featureDetector->removeOutliers(matches, filteredMatches, 3);
             featureDetector->convertGPUKpts(keyPoints1, gpukeyPoints1);
             featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
 
@@ -445,9 +436,9 @@ class VO {
             int nIterations = 4;
             int outlierCount = 0;
 
-            
+            v->setEstimate(currFrame->getPose());
+
             for (int iteration=0; iteration < nIterations; ++iteration) {
-                v->setEstimate(currFrame->getPose());
                 optimizer.initializeOptimization();
                 // optimizer.setVerbose(true);
 
@@ -455,6 +446,7 @@ class VO {
                 outlierCount = 0;
                 for (size_t i=0; i<edges.size(); ++i) {
                     auto e = edges[i];
+
                     if (currFrame->getFeatureInlierFlag(i) == false) {
                         e->computeError();
                     }
@@ -466,23 +458,17 @@ class VO {
                         currFrame->setFeatureInlierFlag(i, true);
                         e->setLevel(0);
                     }
-                    if (iteration == nIterations-1) {
+                    if (iteration == 2) {
                         e->setRobustKernel(nullptr);
                     }
                 }
                 LOG(INFO) << "Iteration: " << iteration << " has " << outlierCount << " outliers";
             }
 
-
             LOG(INFO) << "OPTIMIZER INLIERS: Frame ID: " << currFrame->getFrameID() << " has " << outlierCount << " outliers AND " << currFrame->getKeypoints().size()- outlierCount << " inliers" ;
             
-            // old pose
-            LOG(INFO) << "Frame ID(old): " << currFrame->getFrameID() << " has pose: " << currFrame->getPose().matrix();
-
-        
             // update the pose of the current frame
             currFrame->setPose(v->estimate());
-            LOG(INFO) << "Frame ID(new): " << currFrame->getFrameID() << " has pose: " << currFrame->getPose().matrix();
 
             // return the number of inliers
             return currFrame->getKeypoints().size() - outlierCount;
@@ -524,22 +510,23 @@ class VO {
                                 
             // first empty the keypoints          
             currFrame->clearKeypoints();
-
+            // currFrame->clearInlierFlags();
+            
             for (int i=0; i<flowStatus.size();i++) {
                 if(flowStatus.at(i)==1) {
                     // Flow is good for this point, add this point as feature to the current frame
                 
                     currFrame->addKeypoint(cv::KeyPoint(currPts[i], 3));
+                    obsMapPoints[mapPointIndex[i]]->addObservation(currFrame->getFrameID(), inlierCount);
+
                     currFrame->addObservation(obsMapPoints[mapPointIndex[i]]);
                     // add this point as observation to the mapPoint
-                    obsMapPoints[mapPointIndex[i]]->addObservation(currFrame->getFrameID(), currFrame->getKeypoints().size()-1);
 
                     inlierCount++;
                 }
             }
 
-            // reset the kp inlier flag
-            currFrame->resetFeatureInliers();
+            currFrame->setAllInliers(true);
 
             LOG(INFO) << "TRACKING INLIERS: Frame ID: " << currFrame->getFrameID() << " has " << inlierCount << " inliers out of " << trackedFeatures << " tracked features";
             return inlierCount;
@@ -574,7 +561,7 @@ class VO {
                     featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1);
                     featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
                     featureDetector->matchFeatures(descriptors1, descriptors2, matches);
-                    featureDetector->removeOutliers(matches, filteredMatches);
+                    featureDetector->removeOutliers(matches, filteredMatches, 5);
                     featureDetector->convertGPUKpts(keyPoints1, gpukeyPoints1);
                     featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
 
