@@ -38,6 +38,7 @@ class OptFlow {
             if (isGPU) {
                 optFlowGPU = cv::cuda::SparsePyrLKOpticalFlow::create();
                 optFlowGPU->setWinSize(cv::Size(11, 11));
+                optFlowGPU->setUseInitialFlow(true);
                 // optFlowGPU->
             }
             else {
@@ -46,6 +47,8 @@ class OptFlow {
         }
 
         bool getOptFlow(Frame::Ptr srcFrame, Frame::Ptr dstFrame, std::vector<cv::Point2f> &prevPts, std::vector<cv::Point2f> &nextPts) {
+            std::vector<uchar> flowStatusTemp;
+
             if (isGPU) {
                 // convert all images to GPU
                 cv::cuda::GpuMat srcImg, dstImg, flowStatusGPU, errorGPU;
@@ -61,8 +64,10 @@ class OptFlow {
                         LOG(ERROR) << "Exception caught: " << e.what();
                         return false;
                     }
-                    downloadToCpu(flowStatusGPU, flowStatus);
+                    downloadToCpu(flowStatusGPU, flowStatusTemp);
                 }
+                this->flowStatus = {};
+                this->flowStatus = flowStatusTemp;
                 return true;
             } else {
                 LOG(ERROR) << "Optical flow with CPU not implemented yet";

@@ -64,7 +64,7 @@ class Frame  {
                        0, 0, 1, 0, 
                        0, 0 ,0 ,1;
 
-            Sophus::SE3d returnPose(poseMat*this->pose.matrix());
+            Sophus::SE3d returnPose(this->pose.matrix()*poseMat);
 
             return returnPose;
 
@@ -110,7 +110,7 @@ class Frame  {
             std::unique_lock<std::mutex> lock(poseMutex);
             return featureInlierFlag;
         }
-        int getFeatureInlierFlag(int kpID) {
+        bool getFeatureInlierFlag(int kpID) {
             std::unique_lock<std::mutex> lock(poseMutex);
             return featureInlierFlag[kpID];
         }
@@ -200,7 +200,7 @@ class Frame  {
                     return obsMapPoint.first;
                 }
             }
-            LOG(ERROR) << "Frame ID: " << frameID << " does not have a map point ID for keypoint ID: " << kpID;
+            // LOG(ERROR) << "Frame ID: " << frameID << " does not have a map point ID for keypoint ID: " << kpID;
             return -1;
         }
 

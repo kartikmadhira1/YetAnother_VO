@@ -38,7 +38,7 @@ class VO {
 
         bool relVelSet = false;
         // Thresholds
-        int minInlierCount = 70;
+        int minInlierCount = 50;
 
     public:
         // viewer thread has to be in main thread
@@ -162,16 +162,15 @@ class VO {
                 currFrame->setPose(relativeMotion*prevFrame->getPose());
 
 
-                // If relative velocity is not set, we need to find matches in the second frame and then set 
-                if (!relVelSet) {
-                    LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " - Initializing SECOND frame";
-                    initSecFrame();
-
-                    relVelSet = true;
-                } else {
-                    int optFlowInlierCount = track();
-                }
-
+                // // If relative velocity is not set, we need to find matches in the second frame and then set 
+                // if (!relVelSet) {
+                //     LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " - Initializing SECOND frame";
+                //     initSecFrame();
+                //     relVelSet = true;
+                // } else {
+                //     int optFlowInlierCount = track();
+                // }
+                int optFlowInlierCount = track();
                 // 5. If more than 20% points are inliers, register frame as regular frame, update the mapPoint with new observation and update frame with observation
 
                 // optimize the pose of the current frame using PnP provided there are enough inliers
@@ -189,13 +188,13 @@ class VO {
 
                     // triangulate new points
                     triangulateNewPoints(indexLastFrameKp);
-                    map->insertKeyFrame(currFrame);
-                    map->insertKeyFrame(currFrame->rightFrame);
-                    viewer->addCurrentFrame(currFrame);
+
                 }
 
                 // register as a keyframe
-         
+                map->insertKeyFrame(currFrame);
+                map->insertKeyFrame(currFrame->rightFrame);
+                viewer->addCurrentFrame(currFrame);
                 relativeMotion = currFrame->getPose()*prevFrame->getPose().inverse();
            
                 prevFrame = currFrame;
@@ -261,7 +260,7 @@ class VO {
             int index=0;
             for (auto &eachMatch : filteredMatches) {
                 // if prevPoint belongs to a matched point
-                if (prevFrame->getFeatureInlierFlag(eachMatch.queryIdx)) {
+                // if (prevFrame->getFeatureInlierFlag(eachMatch.queryIdx)) {
                     // if such mapPoint exists with this keypoint
                     if (prevFrame->getMpIDfromKpID(eachMatch.queryIdx) != -1) {
                         // get the keypoint from the previous frame
@@ -282,7 +281,7 @@ class VO {
                         index++;
 
                     }
-                }
+                // }
 
             }
             cv::Mat out;
@@ -290,7 +289,9 @@ class VO {
             auto rVec = currFrame->getKeypoints();
             // temp function to see matches between previous and current frame
             featureDetector->drawMatches(cvLeftImage, cvRightImage, lVec, rVec, filteredMatchesCheck, out);
-            cv::imwrite("image" + std::to_string(currFrame->getFrameID())+ "_initSecFrame_check.png", out);
+            if (this->debugMode) {
+                cv::imwrite("image" + std::to_string(currFrame->getFrameID())+ "_initSecFrame.png", out);
+            }
 
             // set all inliers to true
             currFrame->setAllInliers(true);
@@ -305,6 +306,8 @@ class VO {
             cv::Mat mask(frame->getRawImg().size(), CV_8UC1, 255);
             cv::Mat imgCopy = frame->getRawImg();
             cv::cvtColor(imgCopy, imgCopy, cv::COLOR_GRAY2BGR);
+            cv::Mat imgCopy2 = frame->getRawImg();
+            cv::cvtColor(imgCopy2, imgCopy2, cv::COLOR_GRAY2BGR);
             // if this is a tracked frame, mask the current features
             if (trackedFrame) {
                 auto currFrameKpts = frame->getKeypoints();
@@ -339,6 +342,7 @@ class VO {
 
             // set new feautres to the frame
             int indexLastFrameKp = frame->getKeypoints().size();
+            int indexLastFrameCopy = indexLastFrameKp;
 
             for (auto &keyPoint : keyPoints1) {
                 frame->addKeypoint(keyPoint);
@@ -354,9 +358,30 @@ class VO {
                 // indexLastFrameKp++;
             }
 
+
+            std:vector<cv::DMatch> filteredMatchesCheck;
+
+            for (auto &eachMatch : filteredMatches) {
+                cv::DMatch newMatch;
+                newMatch.queryIdx = indexLastFrameCopy + eachMatch.queryIdx;
+                newMatch.trainIdx = eachMatch.trainIdx;
+                newMatch.distance = eachMatch.distance;
+                filteredMatchesCheck.push_back(newMatch);
+            }
+
+            auto lFeat = frame->getKeypoints();
+            auto rFeat = frame->rightFrame->getKeypoints();
+
+            featureDetector->drawMatches(cvLeftImage, cvRightImage, lFeat, rFeat, filteredMatchesCheck, imgCopy2);
+            // cv::imwrite("image" + std::to_string(frame->getFrameID())+ "_lrCheck.png", imgCopy2);
+
+
+            frame->rightFrame->setAllInliers(true);
             // set LR matches to filtered matches
             frame->setLRmatches(filteredMatches);
-            cv::imwrite("image" + std::to_string(frame->getFrameID())+ "_mask_check.png", imgCopy);
+            if (this->debugMode) {
+                cv::imwrite("image" + std::to_string(frame->getFrameID())+ "_mask_check.png", imgCopy);
+            }
             return true;
         } 
 
@@ -371,9 +396,10 @@ class VO {
             }
             // update map with all 3d points 
             insertMPfromFrame(currFrame);
-            LOG(INFO) << "New points triangulated";
+            LOG(INFO) << "New points triangulated: " << currFrame->rightFrame->getObsMapPoints().size();
             return true;
         }
+
 
         int optimizeCurrPose() {
             // set up g2o
@@ -436,12 +462,12 @@ class VO {
             int nIterations = 4;
             int outlierCount = 0;
 
-            v->setEstimate(currFrame->getPose());
 
             for (int iteration=0; iteration < nIterations; ++iteration) {
-                optimizer.initializeOptimization();
                 // optimizer.setVerbose(true);
+                v->setEstimate(currFrame->getPose());
 
+                optimizer.initializeOptimization();
                 optimizer.optimize(10);
                 outlierCount = 0;
                 for (size_t i=0; i<edges.size(); ++i) {
@@ -457,18 +483,21 @@ class VO {
                     } else {
                         currFrame->setFeatureInlierFlag(i, true);
                         e->setLevel(0);
-                    }
+                    };
                     if (iteration == 2) {
                         e->setRobustKernel(nullptr);
                     }
                 }
-                LOG(INFO) << "Iteration: " << iteration << " has " << outlierCount << " outliers";
             }
 
             LOG(INFO) << "OPTIMIZER INLIERS: Frame ID: " << currFrame->getFrameID() << " has " << outlierCount << " outliers AND " << currFrame->getKeypoints().size()- outlierCount << " inliers" ;
             
             // update the pose of the current frame
-            currFrame->setPose(v->estimate());
+            Sophus::SE3d newPose = v->estimate();
+            LOG(INFO) << "New Pose = \n" << currFrame->getPose().matrix();
+
+            currFrame->setPose(newPose);
+            LOG(INFO) << "Current Pose = \n" << currFrame->getPose().matrix();
 
             // return the number of inliers
             return currFrame->getKeypoints().size() - outlierCount;
@@ -482,47 +511,103 @@ class VO {
             std::vector<cv::Point2f> prevPts, currPts;
             std::vector<int> mapPointIndex;
             int trackedFeatures = 0;
-            for (auto &obsMapPoint : obsMapPoints) {
-                cv::Point2f singlePrevPt =  prevFrame->getKeypoints()[obsMapPoint.second->getKpID(prevFrame->getFrameID())].pt;
+            int notInFramePoints = 0;
+            // for (auto &obsMapPoint : obsMapPoints) {
+            //     cv::Point2f singlePrevPt =  prevFrame->getKeypoints()[obsMapPoint.second->getKpID(prevFrame->getFrameID())].pt;
                 
-                // now get 3d location of this mapPoint and reproject it to the current frame
-                Vec3 mapPoint3D = obsMapPoint.second->getPosition();
-                cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
-                // check if the point is within the image
+            //     // now get 3d location of this mapPoint and reproject it to the current frame
+            //     Vec3 mapPoint3D = obsMapPoint.second->getPosition();
+            //     cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
+            //     // check if the point is within the image
 
-                if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
-                    continue;
+            //     if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
+            //         notInFramePoints++;
+            //         continue;
+            //     }
+
+            //     prevPts.push_back(singlePrevPt);
+            //     currPts.push_back(currPt);
+            //     mapPointIndex.push_back(obsMapPoint.first);
+            //     trackedFeatures++;
+            // }
+            auto prevKpts = prevFrame->getKeypoints();
+            for (int i=0; i<prevKpts.size();i++) {
+                
+                // if this point has a 3d point
+                if (prevFrame->getMpIDfromKpID(i) != -1) {
+                    // get the 3d point
+                    auto mapPoint = obsMapPoints[prevFrame->getMpIDfromKpID(i)];
+                    // get the 2d point
+                    cv::Point2f singlePrevPt =  prevKpts[i].pt;
+                    // now get 3d location of this mapPoint and reproject it to the current frame
+                    Vec3 mapPoint3D = mapPoint->getPosition();
+                    cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
+                    // check if the point is within the image
+
+                    if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
+                        notInFramePoints++;
+                        continue;
+                    }
+
+                    prevPts.push_back(singlePrevPt);
+                    currPts.push_back(currPt);
+                    // mapPointIndex.push_back(mapPoint->getID());
+                    trackedFeatures++;
+                } else {
+                    // prev and curr will have same points
+
+                    cv::Point2f singlePrevPt =  prevKpts[i].pt;
+                    prevPts.push_back(singlePrevPt);
+                    currPts.push_back(singlePrevPt);
                 }
-
-                prevPts.push_back(singlePrevPt);
-                currPts.push_back(currPt);
-                mapPointIndex.push_back(obsMapPoint.first);
-                trackedFeatures++;
             }
+
+
             // log the number of tracked features for this frame pair
             LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << trackedFeatures << " reprojected 3d points from " << obsMapPoints.size() << " 3d points ";
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << notInFramePoints << " rejected points that dont fit the frame ";
 
 
             int inlierCount = 0;
-            // now get the flow between the two frames
-            optFlow->getOptFlow(prevFrame, currFrame, prevPts, currPts);
-            std::vector<uchar> flowStatus = optFlow->getFlowStatus();
+            // // now get the flow between the two frames
+            // optFlow->getOptFlow(prevFrame, currFrame, prevPts, currPts);
+            // std::vector<uchar> flowStatus = optFlow->getFlowStatus();
                                 
+
+            std::vector<uchar> flowStatus;
+            cv::Mat error;
+            cv::calcOpticalFlowPyrLK(
+                prevFrame->getRawImg(), currFrame->getRawImg(), prevPts,
+                currPts, flowStatus, error, cv::Size(11, 11), 3,
+                cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 30,
+                                0.01),
+                cv::OPTFLOW_USE_INITIAL_FLOW);
+
+
+
+
             // first empty the keypoints          
             currFrame->clearKeypoints();
             // currFrame->clearInlierFlags();
             
+
             for (int i=0; i<flowStatus.size();i++) {
-                if(flowStatus.at(i)==1) {
+                if(flowStatus[i]) {
                     // Flow is good for this point, add this point as feature to the current frame
-                
-                    currFrame->addKeypoint(cv::KeyPoint(currPts[i], 3));
-                    obsMapPoints[mapPointIndex[i]]->addObservation(currFrame->getFrameID(), inlierCount);
 
-                    currFrame->addObservation(obsMapPoints[mapPointIndex[i]]);
-                    // add this point as observation to the mapPoint
 
-                    inlierCount++;
+                    // check if this mappoint exists, if not then create new one
+                    if (prevFrame->getMpIDfromKpID(i) !=-1) {
+                        currFrame->addKeypoint(cv::KeyPoint(currPts[i], 3));
+
+                        obsMapPoints[prevFrame->getMpIDfromKpID(i)]->addObservation(currFrame->getFrameID(), inlierCount);
+                        // add this point as observation to the mapPoint
+                        currFrame->addObservation(obsMapPoints[prevFrame->getMpIDfromKpID(i)]);
+                                            inlierCount++;
+
+                    } 
+            
+
                 }
             }
 

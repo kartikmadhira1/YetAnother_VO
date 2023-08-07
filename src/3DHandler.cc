@@ -94,6 +94,12 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
     // set poses for both views
     std::cout << srcFrame->getFrameID() << " " << dstFrame->getFrameID() << std::endl;
     std::vector<Sophus::SE3d> poses{srcFrame->getPose(), srcFrame->getRightPoseInWorldFrame()};
+    // LOG POSES
+
+    LOG(INFO) << "src frame pose: " << srcFrame->getPose().matrix();
+    LOG(INFO) << "dst frame pose: " << srcFrame->getRightPoseInWorldFrame().matrix();
+    
+    
     std::vector<cv::Point2f> srcPts;
     std::vector<cv::Point2f> dstPts;
       
@@ -121,6 +127,8 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
             if (trackedFrame) {
                 pWorld = Tcw * pWorld;
             }
+            // log the 3d point
+            
             auto newMapPoint = std::make_shared<MapPoint>(MapPoint::createMapPointID(), pWorld);
             // register the features that led to creation of this 3d point
             newMapPoint->addObservation(srcFrame->getFrameID(), lastIndexofTrackedKP + match.queryIdx);
@@ -131,6 +139,10 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
             dstFrame->addObservation(newMapPoint);
 
             // add the 3d point to the map itself??????*******************  
+        } else {
+            // set inlier flag to false for these points
+            srcFrame->setFeatureInlierFlag(lastIndexofTrackedKP + match.queryIdx, false);
+            dstFrame->setFeatureInlierFlag(match.trainIdx, false);
         }
     }
     LOG(INFO) << "Triangulated: " << landmarkCount << " points";
