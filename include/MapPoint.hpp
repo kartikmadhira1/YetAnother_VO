@@ -18,7 +18,7 @@ class MapPoint {
         std::mutex mapPointMutex;
 
     public:
-        typedef std::weak_ptr<MapPoint> Ptr;
+        typedef std::shared_ptr<MapPoint> Ptr;
         MapPoint() {}
         MapPoint(unsigned long _mapPointID, cv::Point3d _position) {
             mapPointID = _mapPointID;

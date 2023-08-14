@@ -38,7 +38,7 @@ class VO {
 
         bool relVelSet = false;
         // Thresholds
-        int minInlierCount = 50;
+        int minInlierCount = 80;
 
     public:
         // viewer thread has to be in main thread
@@ -207,100 +207,7 @@ class VO {
 
         }
 
-        bool initSecFrame() {
-            // find features in this second frame and then match with the first ref frame
-            cv::cuda::GpuMat leftImage, rightImage;
-            cv::cuda::GpuMat gpukeyPoints1, gpukeyPoints2, gpukeyPointsCheck, descriptors1, descriptors2;
-            cv::Mat matDescriptors1, matDescriptors2;
-            std::vector<cv::DMatch> matches, filteredMatches;
-            std::vector<cv::KeyPoint> keyPoints1, keyPoints2;
-            cv::Mat mask(currFrame->getRawImg().size(), CV_8UC1, 255);
-            cv::cuda::GpuMat maskGPU;
-            maskGPU.upload(mask);
-            cv::Mat cvLeftImage = prevFrame->getRawImg();
-            cv::Mat cvRightImage = currFrame->getRawImg();
-            
-            leftImage.upload(cvLeftImage);
-            rightImage.upload(cvRightImage);
-
-            // gpukeypoints will need to have a mat of numFeaturesx6 size
-            // 6 columns gpu will be x,y,1, size, angle, response
-            auto lefKpts = prevFrame->getKeypoints();
-            cv::Mat keypointsMatLeft(lefKpts.size(), 6, CV_32FC1);
-
-            for (size_t i = 0; i < lefKpts.size(); i++) {
-                keypointsMatLeft.at<float>(i, 0) = lefKpts[i].pt.x;
-                keypointsMatLeft.at<float>(i, 1) = lefKpts[i].pt.y;
-                keypointsMatLeft.at<float>(i, 2) = lefKpts[i].size;
-                keypointsMatLeft.at<float>(i, 3) = lefKpts[i].angle;
-                keypointsMatLeft.at<float>(i, 4) = lefKpts[i].response;
-                keypointsMatLeft.at<float>(i, 5) = lefKpts[i].octave;
-            }
-
-            gpukeyPoints1.upload(keypointsMatLeft);
-            
-            cv::Mat lImgDesc = prevFrame->getDescriptors();
-            descriptors1.upload(lImgDesc);
-            // featureDetector->detectFeatures(leftImage, gpukeyPoints1, descriptors1, maskGPU ,true);
-            featureDetector->detectFeatures(rightImage, gpukeyPoints2, descriptors2);
- 
-            featureDetector->matchFeatures(descriptors1, descriptors2, matches);
-
-            featureDetector->removeOutliers(matches, filteredMatches, 5);
-
-            featureDetector->convertGPUKpts(keyPoints2, gpukeyPoints2);
-       
-            // log filtered matches info
-            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << filteredMatches.size() << " matches with reference frame";
-
-            // now apply current frame with all the filtered matches
-            currFrame->clearKeypoints();
-            auto obsMapPoints = prevFrame->getObsMapPoints();
-            std::vector<cv::DMatch> filteredMatchesCheck;
-            int index=0;
-            for (auto &eachMatch : filteredMatches) {
-                // if prevPoint belongs to a matched point
-                // if (prevFrame->getFeatureInlierFlag(eachMatch.queryIdx)) {
-                    // if such mapPoint exists with this keypoint
-                    if (prevFrame->getMpIDfromKpID(eachMatch.queryIdx) != -1) {
-                        // get the keypoint from the previous frame
-                        // auto currKpt = curr->getKeypoints()[eachMatch.queryIdx];
-                        // add the keypoint to the current frame
-                        currFrame->addKeypoint(keyPoints2[eachMatch.trainIdx]);
-                        cv::DMatch newMatch;
-                        newMatch.queryIdx = eachMatch.queryIdx;
-                        newMatch.trainIdx = index;
-                        newMatch.distance = eachMatch.distance;
-                        filteredMatchesCheck.push_back(newMatch);
-                        // add observation to the map point
-                        auto mapPoint = obsMapPoints[prevFrame->getMpIDfromKpID(eachMatch.queryIdx)];
-                        mapPoint->addObservation(currFrame->getFrameID(), index);
-                        currFrame->addObservation(mapPoint);
-
-                        // obsMapPoints[prevFrame->getMpIDfromKpID(eachMatch.queryIdx)]->addObservation(currFrame->getFrameID(), index);
-                        index++;
-
-                    }
-                // }
-
-            }
-            cv::Mat out;
-            auto lVec = prevFrame->getKeypoints();
-            auto rVec = currFrame->getKeypoints();
-            // temp function to see matches between previous and current frame
-            featureDetector->drawMatches(cvLeftImage, cvRightImage, lVec, rVec, filteredMatchesCheck, out);
-            if (this->debugMode) {
-                cv::imwrite("image" + std::to_string(currFrame->getFrameID())+ "_initSecFrame.png", out);
-            }
-
-            // set all inliers to true
-            currFrame->setAllInliers(true);
-
-            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << index << " observations from the previous frame";
-            return true;
-
-        }
-
+    
 
         bool detectNewFeatures(bool trackedFrame, Frame::Ptr frame) {
             cv::Mat mask(frame->getRawImg().size(), CV_8UC1, 255);
@@ -427,6 +334,8 @@ class VO {
             auto currFrameKpts = currFrame->getKeypoints();
             auto currFrameObs = currFrame->getObsMapPoints();
             // get kp size
+            int edgeID = 0;
+            std::map<int, int> edgeToKpID;
             for (int i=0; i< currFrameKpts.size();i++) {
                 // get current frame keypoint
                 auto currFrameKpt = currFrameKpts[i];
@@ -453,7 +362,11 @@ class VO {
                 e->setRobustKernel(new g2o::RobustKernelHuber());
                 edges.push_back(e);
                 optimizer.addEdge(e);
+
+                // need to map the kpID to edgeID
+                edgeToKpID[edgeID] = i;
                 index++;
+                edgeID++;
 
             }
           
@@ -472,16 +385,16 @@ class VO {
                 outlierCount = 0;
                 for (size_t i=0; i<edges.size(); ++i) {
                     auto e = edges[i];
-
-                    if (currFrame->getFeatureInlierFlag(i) == false) {
+                    int kpID = edgeToKpID[i];
+                    if (currFrame->getFeatureInlierFlag(kpID) == false) {
                         e->computeError();
                     }
                     if (e->chi2() > chi2Thresh) {
-                        currFrame->setFeatureInlierFlag(i, false);
+                        currFrame->setFeatureInlierFlag(kpID, false);
                         e->setLevel(1);
                         outlierCount++;
                     } else {
-                        currFrame->setFeatureInlierFlag(i, true);
+                        currFrame->setFeatureInlierFlag(kpID, true);
                         e->setLevel(0);
                     };
                     if (iteration == 2) {
@@ -512,25 +425,11 @@ class VO {
             std::vector<int> mapPointIndex;
             int trackedFeatures = 0;
             int notInFramePoints = 0;
-            // for (auto &obsMapPoint : obsMapPoints) {
-            //     cv::Point2f singlePrevPt =  prevFrame->getKeypoints()[obsMapPoint.second->getKpID(prevFrame->getFrameID())].pt;
-                
-            //     // now get 3d location of this mapPoint and reproject it to the current frame
-            //     Vec3 mapPoint3D = obsMapPoint.second->getPosition();
-            //     cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
-            //     // check if the point is within the image
-
-            //     if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
-            //         notInFramePoints++;
-            //         continue;
-            //     }
-
-            //     prevPts.push_back(singlePrevPt);
-            //     currPts.push_back(currPt);
-            //     mapPointIndex.push_back(obsMapPoint.first);
-            //     trackedFeatures++;
-            // }
+            int previousPoints = 0;
             auto prevKpts = prevFrame->getKeypoints();
+            // std::vector<int> prevKpIDs;
+            int prevKpID = 0;
+            std::map<int, int> prevPointMap;
             for (int i=0; i<prevKpts.size();i++) {
                 
                 // if this point has a 3d point
@@ -553,27 +452,31 @@ class VO {
                     currPts.push_back(currPt);
                     // mapPointIndex.push_back(mapPoint->getID());
                     trackedFeatures++;
+                    prevPointMap[prevKpID] = i;
+                    prevKpID++;
                 } else {
                     // prev and curr will have same points
 
                     cv::Point2f singlePrevPt =  prevKpts[i].pt;
                     prevPts.push_back(singlePrevPt);
                     currPts.push_back(singlePrevPt);
+                    previousPoints++;
+                    prevPointMap[prevKpID] = i;
+                    prevKpID++;
                 }
             }
 
 
             // log the number of tracked features for this frame pair
-            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << trackedFeatures << " reprojected 3d points from " << obsMapPoints.size() << " 3d points ";
-            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has " << notInFramePoints << " rejected points that dont fit the frame ";
-
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has: " << trackedFeatures << " reprojected 3d points from:" << obsMapPoints.size() << " 3d points ";
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has: " << previousPoints << "previous points that dont have 3d points";
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has: " << notInFramePoints << " rejected points that dont fit the frame ";
+            // log total points
+            LOG(INFO) << "Frame ID: " << currFrame->getFrameID() << " has: " << prevKpts.size() << " total points";
 
             int inlierCount = 0;
-            // // now get the flow between the two frames
-            // optFlow->getOptFlow(prevFrame, currFrame, prevPts, currPts);
-            // std::vector<uchar> flowStatus = optFlow->getFlowStatus();
-                                
 
+            // this will have to be a different function
             std::vector<uchar> flowStatus;
             cv::Mat error;
             cv::calcOpticalFlowPyrLK(
@@ -583,26 +486,24 @@ class VO {
                                 0.01),
                 cv::OPTFLOW_USE_INITIAL_FLOW);
 
-
-
-
             // first empty the keypoints          
             currFrame->clearKeypoints();
-            // currFrame->clearInlierFlags();
+            // Need to make sure flowstatus size and prevKpts size are same
             
-
             for (int i=0; i<flowStatus.size();i++) {
                 if(flowStatus[i]) {
                     // Flow is good for this point, add this point as feature to the current frame
 
 
                     // check if this mappoint exists, if not then create new one
-                    if (prevFrame->getMpIDfromKpID(i) !=-1) {
+                    // get original keypoint id
+                    int originalKpID = prevPointMap[i];
+                    if (prevFrame->getMpIDfromKpID(originalKpID) !=-1) {
                         currFrame->addKeypoint(cv::KeyPoint(currPts[i], 3));
 
-                        obsMapPoints[prevFrame->getMpIDfromKpID(i)]->addObservation(currFrame->getFrameID(), inlierCount);
+                        obsMapPoints[prevFrame->getMpIDfromKpID(originalKpID)]->addObservation(currFrame->getFrameID(), inlierCount);
                         // add this point as observation to the mapPoint
-                        currFrame->addObservation(obsMapPoints[prevFrame->getMpIDfromKpID(i)]);
+                        currFrame->addObservation(obsMapPoints[prevFrame->getMpIDfromKpID(originalKpID)]);
                                             inlierCount++;
 
                     } 
