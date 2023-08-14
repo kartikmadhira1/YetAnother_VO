@@ -163,13 +163,21 @@ class Frame  {
 
 
         // add observation/3D points to the frame
-        void addObservation(MapPoint::Ptr mapPoint) {
+        bool addObservation(MapPoint::Ptr mapPoint) {
             std::unique_lock<std::mutex> lock(poseMutex);
-            if (obsMapPoints.find(mapPoint->getMapPointID()) != obsMapPoints.end()) {
-                LOG(ERROR) << "Frame ID: " << frameID << " already has a map point ID: " << mapPoint->getMapPointID();
-                return;
+            std::shared_ptr<MapPoint> mp = mapPoint.lock();
+
+            if (mp) {
+                if (obsMapPoints.find(mp->getMapPointID()) != obsMapPoints.end()) {
+                    LOG(ERROR) << "Frame ID: " << frameID << " already has a map point ID: " << mp->getMapPointID();
+                    return false;
+                }
+                obsMapPoints[mp->getMapPointID()] = mp;
+            } else {
+                LOG(ERROR) << "Map point ID: " << mp->getMapPointID() << " is already deleted";
+                return false;
             }
-            obsMapPoints[mapPoint->getMapPointID()] = mapPoint;
+            return true;
         }
 
         cv::Mat getRawImg() {
@@ -196,8 +204,14 @@ class Frame  {
         int getMpIDfromKpID(int kpID) {
             std::unique_lock<std::mutex> lock(poseMutex);
             for (auto &obsMapPoint : obsMapPoints) {
-                if (obsMapPoint.second->getKpID(this->frameID) == kpID) {
-                    return obsMapPoint.first;
+                std::shared_ptr<MapPoint> mp = obsMapPoint.second.lock();
+                if (mp) {
+                    if (mp->getKpID(this->frameID) == kpID) {
+                        return obsMapPoint.first;
+                    }
+                } else {
+                    LOG(ERROR) << "Map point ID: " << obsMapPoint.first << " is already deleted";
+                    return -1;
                 }
             }
             // LOG(ERROR) << "Frame ID: " << frameID << " does not have a map point ID for keypoint ID: " << kpID;
