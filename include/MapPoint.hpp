@@ -62,6 +62,12 @@ class MapPoint {
             return mapPointID;
         }
 
+        // set set the map point ID
+        void setMapPointID(int _mapPointID) {
+            std::unique_lock<std::mutex> lock(mapPointMutex);
+            this->mapPointID = _mapPointID;
+        }
+
         unsigned long getObsCount() {
             std::unique_lock<std::mutex> lock(mapPointMutex);
             return obsCount;

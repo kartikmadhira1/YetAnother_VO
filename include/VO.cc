@@ -38,7 +38,7 @@ class VO {
 
         bool relVelSet = false;
         // Thresholds
-        int minInlierCount = 80;
+        int minInlierCount = 30;
 
     public:
         // viewer thread has to be in main thread
@@ -280,7 +280,7 @@ class VO {
             auto rFeat = frame->rightFrame->getKeypoints();
 
             featureDetector->drawMatches(cvLeftImage, cvRightImage, lFeat, rFeat, filteredMatchesCheck, imgCopy2);
-            // cv::imwrite("image" + std::to_string(frame->getFrameID())+ "_lrCheck.png", imgCopy2);
+            cv::imwrite("image" + std::to_string(frame->getFrameID())+ "_lrCheck.png", imgCopy2);
 
 
             frame->rightFrame->setAllInliers(true);
@@ -407,12 +407,15 @@ class VO {
             
             // update the pose of the current frame
             Sophus::SE3d newPose = v->estimate();
-            LOG(INFO) << "New Pose = \n" << currFrame->getPose().matrix();
-
             currFrame->setPose(newPose);
-            LOG(INFO) << "Current Pose = \n" << currFrame->getPose().matrix();
 
-            // return the number of inliers
+            // for all the outlier points, set the 3d point map to -1
+            // for (int i=0; i<currFrame->getKeypoints().size(); i++) {
+            //     if (currFrame->getFeatureInlierFlag(i) == false) {
+            //         currFrame->setMpIDforKpID(i, -1);
+            //     }
+            // }
+
             return currFrame->getKeypoints().size() - outlierCount;
         }
 
@@ -433,36 +436,38 @@ class VO {
             for (int i=0; i<prevKpts.size();i++) {
                 
                 // if this point has a 3d point
-                if (prevFrame->getMpIDfromKpID(i) != -1) {
-                    // get the 3d point
-                    auto mapPoint = obsMapPoints[prevFrame->getMpIDfromKpID(i)];
-                    // get the 2d point
-                    cv::Point2f singlePrevPt =  prevKpts[i].pt;
-                    // now get 3d location of this mapPoint and reproject it to the current frame
-                    Vec3 mapPoint3D = mapPoint->getPosition();
-                    cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
-                    // check if the point is within the image
+                if (prevFrame->getFeatureInlierFlag(i)) {
+                    if (prevFrame->getMpIDfromKpID(i) != -1) {
+                        // get the 3d point
+                        auto mapPoint = obsMapPoints[prevFrame->getMpIDfromKpID(i)];
+                        // get the 2d point
+                        cv::Point2f singlePrevPt =  prevKpts[i].pt;
+                        // now get 3d location of this mapPoint and reproject it to the current frame
+                        Vec3 mapPoint3D = mapPoint->getPosition();
+                        cv::Point2f currPt = currFrame->world2pixel(mapPoint3D, intrinsics);
+                        // check if the point is within the image
 
-                    if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
-                        notInFramePoints++;
-                        continue;
+                        if (currPt.x < 0 || currPt.y < 0 || currPt.x > currFrame->getRawImg().cols || currPt.y > currFrame->getRawImg().rows) {
+                            notInFramePoints++;
+                            continue;
+                        }
+
+                        prevPts.push_back(singlePrevPt);
+                        currPts.push_back(currPt);
+                        // mapPointIndex.push_back(mapPoint->getID());
+                        trackedFeatures++;
+                        prevPointMap[prevKpID] = i;
+                        prevKpID++;
+                    } else {
+                        // prev and curr will have same points
+
+                        cv::Point2f singlePrevPt =  prevKpts[i].pt;
+                        prevPts.push_back(singlePrevPt);
+                        currPts.push_back(singlePrevPt);
+                        previousPoints++;
+                        prevPointMap[prevKpID] = i;
+                        prevKpID++;
                     }
-
-                    prevPts.push_back(singlePrevPt);
-                    currPts.push_back(currPt);
-                    // mapPointIndex.push_back(mapPoint->getID());
-                    trackedFeatures++;
-                    prevPointMap[prevKpID] = i;
-                    prevKpID++;
-                } else {
-                    // prev and curr will have same points
-
-                    cv::Point2f singlePrevPt =  prevKpts[i].pt;
-                    prevPts.push_back(singlePrevPt);
-                    currPts.push_back(singlePrevPt);
-                    previousPoints++;
-                    prevPointMap[prevKpID] = i;
-                    prevKpID++;
                 }
             }
 
@@ -580,21 +585,21 @@ class VO {
             // Triangulate points based on the LR stereo images
             std::vector<cv::DMatch> matches = currFrame->getLRMatches();
 
-            currFrame->setAllInliers(false);
-            currFrame->rightFrame->setAllInliers(false);
-            // add keypoints only that are matches
-            for (auto &eachMatch : matches) {
+            // currFrame->setAllInliers(false);
+            // currFrame->rightFrame->setAllInliers(false);
+            // // add keypoints only that are matches
+            // for (auto &eachMatch : matches) {
              
-                // set the feature inlier flag to true
-                currFrame->setFeatureInlierFlag(eachMatch.queryIdx, true);
-                // do same for right frame
-                currFrame->rightFrame->setFeatureInlierFlag(eachMatch.trainIdx, true);
-            }
+            //     // set the feature inlier flag to true
+            //     currFrame->setFeatureInlierFlag(eachMatch.queryIdx, true);
+            //     // do same for right frame
+            //     currFrame->rightFrame->setFeatureInlierFlag(eachMatch.trainIdx, true);
+            // }
 
 
 
             bool ret = Handler3D->triangulateAll(currFrame, currFrame->rightFrame, matches,false, 0);
-             currFrame->rightFrame->setPose(currFrame->getRightPoseInWorldFrame());
+            // currFrame->rightFrame->setPose(currFrame->getRightPoseInWorldFrame());
 
             if (!ret) {
                 return false;

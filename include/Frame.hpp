@@ -204,6 +204,21 @@ class Frame  {
             return -1;
         }
 
+        // set the mp ID for a keypoint ID
+        bool setMpIDforKpID(int kpID, int mpID) {
+            std::unique_lock<std::mutex> lock(poseMutex);
+            for (auto &obsMapPoint : obsMapPoints) {
+                if (obsMapPoint.second->getKpID(this->frameID) == kpID) {
+                    obsMapPoint.second->setMapPointID(mpID);
+                    return true;
+                }
+            }
+            LOG(ERROR) << "Frame ID: " << frameID << " does not have a map point ID for keypoint ID: " << kpID;
+            return false;
+        }
+
+
+
         // get descriptors
         cv::Mat getDescriptors() {
             std::unique_lock<std::mutex> lock(poseMutex);

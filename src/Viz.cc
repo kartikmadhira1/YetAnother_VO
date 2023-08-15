@@ -162,9 +162,11 @@ void Viewer::drawMPs() {
     glPointSize(2);
     glBegin(GL_POINTS);
     for (auto& ld: mps) {
-        auto pos = ld.second->getPosition();
-        glColor3f(red[0], red[1], red[2]);
-        glVertex3d(pos[0], pos[1], pos[2]);
+        if(ld.second->getMapPointID() != -1) {
+            auto pos = ld.second->getPosition();
+            glColor3f(red[0], red[1], red[2]);
+            glVertex3d(pos[0], pos[1], pos[2]);
+        }
     }
     glEnd();
 }

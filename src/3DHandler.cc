@@ -86,18 +86,30 @@ inline bool _3DHandler::triangulatePoint(const std::vector<Sophus::SE3d> &poses,
 
 
 
-// trinagulation after creating Map and MapPoints
+// triangulation after creating Map and MapPoints
+// Fundamentally, the base poses of the two cameras need not be the current poses.
+// They can be the poses at t0 and 3d points triangulated be then transformed with the current pose.
+
 
 bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const std::vector<cv::DMatch> &matches, bool trackedFrame, int lastIndexofTrackedKP=0) {
 
     Sophus::SE3d Tcw = srcFrame ->getPose().inverse();
     // set poses for both views
     std::cout << srcFrame->getFrameID() << " " << dstFrame->getFrameID() << std::endl;
-    std::vector<Sophus::SE3d> poses{srcFrame->getPose(), srcFrame->getRightPoseInWorldFrame()};
+
+    // L pose -> identity and 0 rotation,
+    // R pose -> pose of right camera at t0
+    Eigen::Matrix4d poseMat;
+        poseMat << 1, 0, 0, -intrinsics->Right.getBaseline(), 
+                    0, 1, 0, 0,
+                    0, 0, 1, 0, 
+                    0, 0 ,0 ,1;
+    Sophus::SE3d dstFramePose(poseMat);
+    std::vector<Sophus::SE3d> poses{Sophus::SE3d(), dstFramePose};
     // LOG POSES
 
-    LOG(INFO) << "src frame pose: " << srcFrame->getPose().matrix();
-    LOG(INFO) << "dst frame pose: " << srcFrame->getRightPoseInWorldFrame().matrix();
+    LOG(INFO) << "src frame pose: " << Sophus::SE3d().matrix();
+    LOG(INFO) << "dst frame pose: " << dstFramePose.matrix();
     
     
     std::vector<cv::Point2f> srcPts;
@@ -115,7 +127,7 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
         
         std::vector<Vec3> points {
             this->intrinsics->Left.pixel2camera(cv::Point(srcFrame->getKeypoints()[lastIndexofTrackedKP + match.queryIdx].pt)),
-            this->intrinsics->Left.pixel2camera(cv::Point(dstFrame->getKeypoints()[match.trainIdx].pt))
+            this->intrinsics->Right.pixel2camera(cv::Point(dstFrame->getKeypoints()[match.trainIdx].pt))
         };
 
         Vec3 pWorld = Vec3::Zero();
@@ -139,11 +151,12 @@ bool _3DHandler::triangulateAll(Frame::Ptr srcFrame, Frame::Ptr dstFrame, const 
             dstFrame->addObservation(newMapPoint);
 
             // add the 3d point to the map itself??????*******************  
-        } else {
-            // set inlier flag to false for these points
-            srcFrame->setFeatureInlierFlag(lastIndexofTrackedKP + match.queryIdx, false);
-            dstFrame->setFeatureInlierFlag(match.trainIdx, false);
         }
+        // } else {
+        //     // set inlier flag to false for these points
+        //     srcFrame->setFeatureInlierFlag(lastIndexofTrackedKP + match.queryIdx, false);
+        //     dstFrame->setFeatureInlierFlag(match.trainIdx, false);
+        // }
     }
     LOG(INFO) << "Triangulated: " << landmarkCount << " points";
     LOG(INFO) << "Total Matches: " << matches.size();
