@@ -5,19 +5,19 @@ Iterative addition on top of the YA_VO with Stereo setup.
 
 #### Primary goal of the project:
 
-1. Efficient data-pipelineing and data-processing.
-2. Focus on optimization with more emphasis on explainable optimization code.
-3. Efficient initialization of stereo setup.
-4. Local BA and full BA fully utilized.
-5. Get Loop closure working.
-6. Use OpenCV codes as little as possible.
-7. Lastly, be able to validate the odometry with an error rate. Math to evaluate trajectories also essential.
+[x] Efficient data-pipelineing and data-processing.
+[x] Focus on optimization with more emphasis on explainable optimization code.
+[x] Efficient initialization of stereo setup.
+[ ] Local BA and full BA fully utilized.
+[ ] Get Loop closure working.
+[ ] Use OpenCV codes as little as possible.
+[ ] Lastly, be able to validate the odometry with an error rate. Math to evaluate trajectories also essential.
 
 #### Secondary goals of the project
 
-1. Replace image processing with cuda accelerated code.
-2. Replace keypoint detection, matching and Optical flow with deep learning model.
-3. If everything goes well, generate a dense 3D map of the environment using NeRF.
+[x] Replace image processing with cuda accelerated code.
+[] Replace keypoint detection, matching and Optical flow with deep learning model.
+[] If everything goes well, generate a dense 3D map of the environment using NeRF.
 
 
 
