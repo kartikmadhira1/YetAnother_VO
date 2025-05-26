@@ -1,23 +1,21 @@
-# YA_VO_2
+# YetAnother_VO
 
-Iterative addition on top of the YA_VO with Stereo setup.
+Yet another version for an offline Stereo Visual Odometry. This repository is largely based on the [SLAM book](https://github.com/gaoxiang12/slambook-en) by Xiang Gao and the [ORB-SLAM2 repo](https://github.com/raulmur/ORB_SLAM2)
 
+#### Primary goals of the project:
 
-#### Primary goal of the project:
-
+- [x] Be able to validate the odometry with an error rate. Math to evaluate trajectories also essential.
 - [x] Efficient data-pipelineing and data-processing.
 - [x] Focus on optimization with more emphasis on explainable optimization code.
 - [x] Efficient initialization of stereo setup.
 - [ ] Local BA and full BA fully utilized.
 - [ ] Get Loop closure working.
 - [ ] Use OpenCV codes as little as possible.
-- [ ] Lastly, be able to validate the odometry with an error rate. Math to evaluate trajectories also essential.
 
 #### Secondary goals of the project
 
 - [x] Replace image processing with cuda accelerated code.
-- [ ] Replace keypoint detection, matching and Optical flow with deep learning model.
-- [ ] If everything goes well, generate a dense 3D map of the environment using NeRF.
+- [ ] Replace keypoint detection, matching and Optical flow with deep learning models.
 
 
 
